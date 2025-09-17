@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: crypto-ctf
+    env: python
+    plan: free
+    region: frankfurt
+    rootDir: app
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+    autoDeploy: true
+    healthCheckPath: /health
