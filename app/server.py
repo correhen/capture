@@ -723,3 +723,101 @@ def admin_theme_save():
         conn.execute("INSERT INTO settings(key,value) VALUES('theme_c1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (c1,))
         conn.execute("INSERT INTO settings(key,value) VALUES('theme_c2',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (c2,))
     return redirect("/admin/theme")
+
+@app.post("/admin/upload-flags")
+def admin_upload_flags():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return "Geen bestand geüpload", 400
+
+    import io, csv, json, hashlib
+    from pathlib import Path
+
+    def sha256_hex(s: str) -> str:
+        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+    text = f.read().decode("utf-8", errors="replace")
+    mapping = {}
+
+    # detecteer JSON of CSV
+    if f.filename.lower().endswith(".json") or text.strip().startswith("{"):
+        try:
+            mapping = json.loads(text)
+        except Exception:
+            return "Ongeldige JSON", 400
+    else:
+        rdr = csv.reader(io.StringIO(text))
+        for row in rdr:
+            if len(row) >= 2:
+                ident, flag = row[0].strip(), row[1].strip()
+                if ident and flag:
+                    mapping[ident] = flag
+
+    if not mapping:
+        return "Geen geldige regels gevonden", 400
+
+    # challenge-mappen scannen
+    CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
+    DIFF_MAP = {"1 - Easy":"makkelijk","2 - Medium":"gemiddeld","3 - Hard":"moeilijk"}
+    POINTS = {"makkelijk":1,"gemiddeld":2,"moeilijk":3}
+
+    def list_dirs():
+        out = []
+        for level in DIFF_MAP:
+            base = CHALL_ROOT / level
+            if base.exists():
+                out += [p for p in base.iterdir() if p.is_dir()]
+        return out
+
+    dirs = list_dirs()
+
+    def match_identifier(identifier: str):
+        low = identifier.lower()
+        for d in dirs:
+            if d.name.lower() == low:
+                return d
+            for p in d.glob("*.pdf"):
+                if p.stem.lower() == low:
+                    return d
+        for d in dirs:
+            if low in d.name.lower():
+                return d
+        return None
+
+    created_txt, updated_db, unmatched = 0, 0, 0
+    with db() as conn:
+        for ident, flag in mapping.items():
+            d = match_identifier(ident)
+            if not d:
+                unmatched += 1
+                continue
+
+            # flag.txt schrijven
+            try:
+                (d / "flag.txt").write_text(flag + "\n", encoding="utf-8")
+                created_txt += 1
+            except Exception:
+                pass
+
+            # DB bijwerken
+            fh = sha256_hex(flag)
+            diff = DIFF_MAP.get(d.parent.name, "makkelijk")
+            pts = POINTS.get(diff, 1)
+            row = conn.execute("SELECT id FROM challenges WHERE LOWER(title)=LOWER(?)", (d.name.lower(),)).fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE challenges SET difficulty=?, points=?, flag_hash=?, is_active=1 WHERE id=?",
+                    (diff, pts, fh, row["id"])
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,1)",
+                    (d.name, diff, fh, pts)
+                )
+            updated_db += 1
+
+    session["admin_msg"] = f"Flags verwerkt — {created_txt} flag.txt geschreven, {updated_db} DB-updates, {unmatched} niet gevonden."
+    return redirect("/admin/challenges")
