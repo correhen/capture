@@ -145,6 +145,14 @@ def admin_activate():
     return {"ok": True}
 
 @app.post("/admin/add-team")
+@app.get("/admin/list-teams")
+def admin_list_teams():
+    token = request.headers.get("X-Admin-Token", "")
+    if token != os.getenv("ADMIN_TOKEN", ""):
+        abort(401)
+    with db() as conn:
+        rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
+    return {"teams": [dict(r) for r in rows]}
 @limiter.limit("30 per hour")
 def admin_add_team():
     token = request.headers.get("X-Admin-Token", "")
