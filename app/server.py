@@ -5,6 +5,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from database import db
 from models import sha256_hex, DIFFICULTY_POINTS
+from challenges import ch_bp
 
 # -------- Config --------
 SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24))
@@ -14,6 +15,7 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 BASE_DIR = os.path.dirname(__file__)
 
 app = Flask(__name__)
+app.register_blueprint(ch_bp)
 app.secret_key = SECRET_KEY
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
 
