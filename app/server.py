@@ -17,12 +17,38 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
 
-# -------- DB init/seed --------
+
+# -------- DB init/seed + schema upgrades --------
 def init_db_if_needed():
     with open(os.path.join(BASE_DIR, "schema.sql"), "r", encoding="utf-8") as f:
         schema_sql = f.read()
     with db() as conn:
         conn.executescript(schema_sql)
+
+        # settings table for theme
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS settings(
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )""")
+        if not conn.execute("SELECT 1 FROM settings WHERE key='theme_c1'").fetchone():
+            conn.execute("INSERT INTO settings(key,value) VALUES('theme_c1', '#0d9488')")
+        if not conn.execute("SELECT 1 FROM settings WHERE key='theme_c2'").fetchone():
+            conn.execute("INSERT INTO settings(key,value) VALUES('theme_c2', '#14b8a6')")
+
+        # Schema uitbreidingen (idempotent)
+        try: conn.execute("ALTER TABLE teams ADD COLUMN island TEXT")
+        except Exception: pass
+        try: conn.execute("ALTER TABLE teams ADD COLUMN logo TEXT")
+        except Exception: pass  # niet gebruikt nu, maar kan later handig zijn
+        try: conn.execute("ALTER TABLE challenges ADD COLUMN pdf_url TEXT")
+        except Exception: pass
+        try: conn.execute("ALTER TABLE challenges ADD COLUMN hint TEXT")
+        except Exception: pass
+        try: conn.execute("ALTER TABLE challenges ADD COLUMN hint_revealed INTEGER DEFAULT 0")
+        except Exception: pass
+
+        # Seed alleen als DB leeg is
         c = conn.execute("SELECT COUNT(*) AS c FROM teams").fetchone()["c"]
         d = conn.execute("SELECT COUNT(*) AS c FROM challenges").fetchone()["c"]
         if c == 0 and d == 0:
@@ -35,8 +61,9 @@ def init_db_if_needed():
                 name = t["name"].strip()
                 token = secrets.token_urlsafe(24)
                 join_code = str(secrets.randbelow(900000) + 100000)
-                cur.execute("INSERT OR IGNORE INTO teams(name, join_code, token) VALUES(?,?,?)",
-                            (name, join_code, token))
+                island = t.get("island")
+                cur.execute("INSERT OR IGNORE INTO teams(name, join_code, token, island) VALUES(?,?,?,?)",
+                            (name, join_code, token, island))
             for cobj in chals:
                 title = cobj["title"].strip()
                 diff = cobj["difficulty"].strip()
@@ -45,12 +72,17 @@ def init_db_if_needed():
                     raise ValueError(f"Unknown difficulty: {diff}")
                 flag_hash = sha256_hex(cobj["flag"].strip())
                 active = 1 if cobj.get("active", True) else 0
+                pdf_url = cobj.get("pdf_url")
+                hint = cobj.get("hint")
                 cur.execute(
-                    "INSERT OR IGNORE INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?)",
-                    (title, diff, flag_hash, points, active)
+                    "INSERT OR IGNORE INTO challenges(title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed) VALUES(?,?,?,?,?,?,?,0)",
+                    (title, diff, flag_hash, points, active, pdf_url, hint)
                 )
+
 init_db_if_needed()
 
+
+# -------- Helpers --------
 def current_team():
     token = session.get("team_token")
     if not token:
@@ -62,12 +94,22 @@ def current_team():
 def admin_logged_in() -> bool:
     return session.get("admin_ok") is True
 
+def get_theme():
+    with db() as conn:
+        c1 = conn.execute("SELECT value FROM settings WHERE key='theme_c1'").fetchone()["value"]
+        c2 = conn.execute("SELECT value FROM settings WHERE key='theme_c2'").fetchone()["value"]
+    return {"c1": c1, "c2": c2}
+
+
 # -------- Public routes --------
 @app.get("/")
 def home():
     with db() as conn:
         teams = conn.execute("SELECT name FROM teams ORDER BY name ASC").fetchall()
-    return render_template("home.html", teams=[t["name"] for t in teams])
+    return render_template("home.html",
+                           teams=[t["name"] for t in teams],
+                           error=None,
+                           theme=get_theme())
 
 @app.post("/join")
 @limiter.limit("30 per hour")
@@ -80,23 +122,31 @@ def join():
         row = conn.execute("SELECT token FROM teams WHERE name=? AND join_code=?", (team_name, join_code)).fetchone()
         if not row:
             teams = [t["name"] for t in conn.execute("SELECT name FROM teams ORDER BY name").fetchall()]
-            return render_template("home.html", teams=teams, error="Onjuiste join code of team."), 401
+            return render_template("home.html", teams=teams, error="Onjuiste join code of team.", theme=get_theme()), 401
         session["team_token"] = row["token"]
     return redirect(url_for("submit"))
 
 @app.get("/submit")
 def submit():
-    team = current_team()
-    if not team:
+    t = current_team()
+    if not t:
         return redirect(url_for("home"))
     with db() as conn:
-        challenges = conn.execute(
-            "SELECT id, title, difficulty, points FROM challenges WHERE is_active=1 ORDER BY id ASC"
-        ).fetchall()
+        team = conn.execute("SELECT * FROM teams WHERE id=?", (t["id"],)).fetchone()
+        challenges = conn.execute("""
+            SELECT id, title, difficulty, points, pdf_url, hint, hint_revealed
+            FROM challenges
+            WHERE is_active=1
+            ORDER BY id ASC
+        """).fetchall()
         solved = {r["challenge_id"] for r in conn.execute(
             "SELECT challenge_id FROM solves WHERE team_id=?", (team["id"],)
         ).fetchall()}
-    return render_template("submit.html", team=team, challenges=challenges, solved=solved)
+    return render_template("submit.html",
+                           team=team,
+                           challenges=challenges,
+                           solved=solved,
+                           theme=get_theme())
 
 @app.post("/api/submit")
 @limiter.limit(lambda: RATE_LIMIT_SUBMIT)
@@ -134,14 +184,27 @@ def api_submit():
 @limiter.limit("120 per hour")
 def scoreboard():
     with db() as conn:
-        teams_full = conn.execute("SELECT id, name, score FROM teams ORDER BY score DESC, name ASC").fetchall()
+        teams_full = conn.execute("SELECT id, name, score, logo FROM teams ORDER BY score DESC, name ASC").fetchall()
         solves = conn.execute("SELECT team_id, COUNT(*) c FROM solves GROUP BY team_id").fetchall()
         scount = {r["team_id"]: r["c"] for r in solves}
-    return render_template("scoreboard.html", teams=teams_full, scount=scount)
+    return render_template("scoreboard.html", teams=teams_full, scount=scount, theme=get_theme())
+
+@app.get("/scoreboard/islands")
+def scoreboard_islands():
+    with db() as conn:
+        rows = conn.execute("""
+            SELECT COALESCE(t.island, 'Onbekend') AS island, COUNT(DISTINCT s.challenge_id) AS solved_unique
+            FROM solves s
+            JOIN teams t ON t.id = s.team_id
+            GROUP BY COALESCE(t.island, 'Onbekend')
+            ORDER BY solved_unique DESC, island ASC
+        """).fetchall()
+    return render_template("scoreboard_islands.html", rows=rows, theme=get_theme())
 
 @app.get("/health")
 def health():
     return {"status": "ok", "time": int(time.time())}
+
 
 # -------- Admin APIs (met header-token) --------
 @app.post("/admin/activate")
@@ -182,6 +245,7 @@ def admin_list_teams():
         rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
     return {"teams": [dict(r) for r in rows]}
 
+
 # -------- Admin web: login --------
 @app.post("/admin/teams/login")
 def admin_teams_login():
@@ -190,6 +254,7 @@ def admin_teams_login():
         session["admin_ok"] = True
         return redirect("/admin/teams")
     return "Fout token", 401
+
 
 # -------- Admin web: TEAMS --------
 @app.get("/admin/teams")
@@ -204,7 +269,7 @@ def admin_teams_page():
         """
 
     with db() as conn:
-        rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
+        rows = conn.execute("SELECT name, join_code, island FROM teams ORDER BY name ASC").fetchall()
 
     last = session.pop("last_join_code", None)
     msg  = session.pop("admin_msg", None)
@@ -223,14 +288,21 @@ def admin_teams_page():
 
     row_html = ""
     for r in rows:
+        island_val = r["island"] or ""
         row_html += f"""
           <tr>
             <td style='padding:8px 12px'>{r['name']}</td>
             <td style='padding:8px 12px;font-weight:600'>{r['join_code']}</td>
             <td style='padding:8px 12px'>
-              <form method="post" action="/admin/teams/delete" onsubmit="return confirm('Team \\'{r['name']}\\' verwijderen? Dit wist ook hun solves.');" style="display:inline">
+              <form method="post" action="/admin/teams/delete" onsubmit="return confirm('Team \\'{r['name']}\\' verwijderen? Dit wist ook hun solves.');" style="display:inline-block;margin-right:6px">
                 <input type="hidden" name="name" value="{r['name']}"/>
                 <button style='padding:6px 10px;background:#ef4444;color:#fff;border:none;border-radius:6px'>Verwijderen</button>
+              </form>
+              <form method="post" action="/admin/teams/island" style="display:inline-block">
+                <input type="hidden" name="name" value="{r['name']}"/>
+                <input name="island" value="{island_val}" placeholder="Eiland"
+                       style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;width:120px"/>
+                <button style='padding:6px 10px;background:#334155;color:#fff;border:none;border-radius:6px'>Opslaan</button>
               </form>
             </td>
           </tr>
@@ -267,14 +339,12 @@ def admin_teams_page():
         </tbody>
       </table>
 
-      <p style='color:#64748b;font-size:12px;margin-top:12px'>
-        Verwijderen wist ook alle solves van dat team.
-      </p>
-
       <hr style='margin:28px 0;border:none;border-top:1px solid #e2e8f0' />
       <p>
         <a href="/admin/challenges">👉 Challenges-beheer</a> &nbsp;•&nbsp;
-        <a href="/admin/backup">🗂 Back-up &amp; Restore</a>
+        <a href="/admin/backup">🗂 Back-up &amp; Restore</a> &nbsp;•&nbsp;
+        <a href="/admin/theme">🎨 Thema</a> &nbsp;•&nbsp;
+        <a href="/scoreboard/islands" target="_blank">🌴 Eiland-score</a>
       </p>
     </div>
     """
@@ -324,6 +394,18 @@ def admin_teams_delete():
             session["admin_msg"] = f"Team '{name}' verwijderd."
     return redirect("/admin/teams")
 
+@app.post("/admin/teams/island")
+def admin_teams_island():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    name   = (request.form.get("name") or "").strip()
+    island = (request.form.get("island") or "").strip() or None
+    with db() as conn:
+        conn.execute("UPDATE teams SET island=? WHERE name=?", (island, name))
+    session["admin_msg"] = f"Eiland ingesteld voor {name}."
+    return redirect("/admin/teams")
+
+
 # -------- Admin web: CHALLENGES --------
 @app.get("/admin/challenges")
 def admin_challenges_page():
@@ -331,7 +413,11 @@ def admin_challenges_page():
         return redirect("/admin/teams")
 
     with db() as conn:
-        rows = conn.execute("SELECT id, title, difficulty, points, is_active FROM challenges ORDER BY id ASC").fetchall()
+        rows = conn.execute("""
+          SELECT id, title, difficulty, points, is_active, hint_revealed
+          FROM challenges
+          ORDER BY id ASC
+        """).fetchall()
 
     msg = session.pop("admin_msg", None)
     msg_html = f"""
@@ -343,6 +429,8 @@ def admin_challenges_page():
     row_html = ""
     for r in rows:
         checked = "checked" if r["is_active"] else ""
+        hint_btn = "Hint verbergen" if r["hint_revealed"] else "Hint vrijgeven"
+        hint_action = "hide" if r["hint_revealed"] else "show"
         row_html += f"""
           <tr>
             <td style='padding:8px 12px'>{r['id']}</td>
@@ -355,6 +443,11 @@ def admin_challenges_page():
                   <input type="checkbox" name="active" value="1" {checked} onchange="this.form.submit()"/>
                   <span>{'Actief' if r['is_active'] else 'Uit'}</span>
                 </label>
+              </form>
+              <form method="post" action="/admin/challenges/hint" style="display:inline;margin-left:8px">
+                <input type="hidden" name="id" value="{r['id']}"/>
+                <input type="hidden" name="action" value="{hint_action}"/>
+                <button style='padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px'>{hint_btn}</button>
               </form>
             </td>
           </tr>
@@ -375,7 +468,7 @@ def admin_challenges_page():
             <th style='text-align:left;padding:8px 12px'>ID</th>
             <th style='text-align:left;padding:8px 12px'>Titel</th>
             <th style='text-align:left;padding:8px 12px'>Moeilijkheid (pt)</th>
-            <th style='text-align:left;padding:8px 12px'>Status</th>
+            <th style='text-align:left;padding:8px 12px'>Status + Hint</th>
           </tr>
         </thead>
         <tbody>
@@ -384,12 +477,14 @@ def admin_challenges_page():
       </table>
 
       <h3>Nieuwe challenge toevoegen</h3>
-      <form method="post" action="/admin/challenges/add" style='display:grid;grid-template-columns:1fr 160px 1fr auto;gap:8px;align-items:center'>
+      <form method="post" action="/admin/challenges/add" style='display:grid;grid-template-columns:1fr 160px 1fr 1fr auto;gap:8px;align-items:center'>
         <input name="title" placeholder="Titel" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
         <select name="difficulty" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px'>
           {diff_options}
         </select>
         <input name="flag" placeholder="CTF{{...}}" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <input name="pdf_url" placeholder="PDF URL (optioneel)" style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <input name="hint" placeholder="Tip/hint (optioneel)" style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
         <label style='display:flex;gap:6px;align-items:center;'>
           <input type="checkbox" name="active" value="1" checked />
           Actief
@@ -415,6 +510,18 @@ def admin_challenges_toggle():
     session["admin_msg"] = f"Challenge {cid} {'geactiveerd' if is_active else 'uitgeschakeld'}."
     return redirect("/admin/challenges")
 
+@app.post("/admin/challenges/hint")
+def admin_challenges_hint():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    cid = request.form.get("id")
+    action = request.form.get("action","show")
+    val = 0 if action == "hide" else 1
+    with db() as conn:
+        conn.execute("UPDATE challenges SET hint_revealed=? WHERE id=?", (val, cid))
+    session["admin_msg"] = f"Hint {'vrijgegeven' if val else 'verborgen'} voor challenge {cid}."
+    return redirect("/admin/challenges")
+
 @app.post("/admin/challenges/add")
 def admin_challenges_add():
     if not admin_logged_in():
@@ -422,6 +529,8 @@ def admin_challenges_add():
     title = (request.form.get("title") or "").strip()
     difficulty = (request.form.get("difficulty") or "").strip()
     flag = (request.form.get("flag") or "").strip()
+    pdf_url = (request.form.get("pdf_url") or "").strip()
+    hint = (request.form.get("hint") or "").strip()
     is_active = 1 if request.form.get("active") == "1" else 0
 
     if not title or not difficulty or not flag:
@@ -438,11 +547,12 @@ def admin_challenges_add():
     fhash = sha256_hex(flag)
     with db() as conn:
         conn.execute(
-            "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?)",
-            (title, difficulty, fhash, points, is_active)
+            "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed) VALUES(?,?,?,?,?,?,?,0)",
+            (title, difficulty, fhash, points, is_active, (pdf_url or None), (hint or None))
         )
     session["admin_msg"] = f"Challenge '{title}' toegevoegd."
     return redirect("/admin/challenges")
+
 
 # -------- Admin web: BACKUP / RESTORE --------
 @app.get("/admin/backup")
@@ -495,15 +605,12 @@ def admin_backup_export():
         return "Niet ingelogd als admin", 401
 
     with db() as conn:
-        teams = [dict(r) for r in conn.execute("SELECT id, name, join_code, token, score FROM teams ORDER BY id").fetchall()]
-        chals = [dict(r) for r in conn.execute("SELECT id, title, difficulty, flag_hash, points, is_active FROM challenges ORDER BY id").fetchall()]
+        teams = [dict(r) for r in conn.execute("SELECT id, name, join_code, token, score, island FROM teams ORDER BY id").fetchall()]
+        chals = [dict(r) for r in conn.execute("SELECT id, title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed FROM challenges ORDER BY id").fetchall()]
         solves = [dict(r) for r in conn.execute("SELECT id, team_id, challenge_id FROM solves ORDER BY id").fetchall()]
 
     payload = {
-        "meta": {
-            "version": 1,
-            "exported_at": datetime.datetime.utcnow().isoformat() + "Z"
-        },
+        "meta": {"version": 2, "exported_at": datetime.datetime.utcnow().isoformat() + "Z"},
         "teams": teams,
         "challenges": chals,
         "solves": solves
@@ -542,13 +649,14 @@ def admin_backup_import():
                 cur.execute("DELETE FROM challenges")
             for t in teams:
                 cur.execute(
-                    "INSERT OR REPLACE INTO teams(id, name, join_code, token, score) VALUES(?,?,?,?,?)",
-                    (t.get("id"), t.get("name"), t.get("join_code"), t.get("token"), t.get("score", 0))
+                    "INSERT OR REPLACE INTO teams(id, name, join_code, token, score, island) VALUES(?,?,?,?,?,?)",
+                    (t.get("id"), t.get("name"), t.get("join_code"), t.get("token"), t.get("score", 0), t.get("island"))
                 )
             for c in chals:
                 cur.execute(
-                    "INSERT OR REPLACE INTO challenges(id, title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?,?)",
-                    (c.get("id"), c.get("title"), c.get("difficulty"), c.get("flag_hash"), c.get("points"), c.get("is_active", 1))
+                    "INSERT OR REPLACE INTO challenges(id, title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (c.get("id"), c.get("title"), c.get("difficulty"), c.get("flag_hash"), c.get("points"),
+                     c.get("is_active", 1), c.get("pdf_url"), c.get("hint"), c.get("hint_revealed", 0))
                 )
             for s in solves:
                 cur.execute(
@@ -560,3 +668,56 @@ def admin_backup_import():
         session["admin_msg"] = f"Import mislukt: {e}"
 
     return redirect("/admin/backup")
+
+
+# -------- Admin web: THEME --------
+@app.get("/admin/theme")
+def admin_theme_page():
+    if not admin_logged_in():
+        return redirect("/admin/teams")
+    th = get_theme()
+    return f"""
+    <div style='font-family:sans-serif;max-width:640px;margin:24px auto'>
+      <h2>Thema-kleuren</h2>
+      <form method="post" action="/admin/theme" style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
+        <label>Primair<br><input type="color" name="c1" value="{th['c1']}" style="width:100%;height:42px;border:1px solid #cbd5e1;border-radius:6px"></label>
+        <label>Secundair (gradient)<br><input type="color" name="c2" value="{th['c2']}" style="width:100%;height:42px;border:1px solid #cbd5e1;border-radius:6px"></label>
+        <button style="padding:10px 14px;background:{th['c1']};color:#fff;border:none;border-radius:8px">Opslaan</button>
+      </form>
+
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <form method="post" action="/admin/theme">
+          <input type="hidden" name="c1" value="#0d9488"><input type="hidden" name="c2" value="#14b8a6">
+          <button style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px">Preset: Teal</button>
+        </form>
+        <form method="post" action="/admin/theme">
+          <input type="hidden" name="c1" value="#2563eb"><input type="hidden" name="c2" value="#06b6d4">
+          <button style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px">Preset: Blauw</button>
+        </form>
+        <form method="post" action="/admin/theme">
+          <input type="hidden" name="c1" value="#f59e0b"><input type="hidden" name="c2" value="#f43f5e">
+          <button style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px">Preset: Sunset</button>
+        </form>
+        <form method="post" action="/admin/theme">
+          <input type="hidden" name="c1" value="#10b981"><input type="hidden" name="c2" value="#84cc16">
+          <button style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px">Preset: Lime</button>
+        </form>
+      </div>
+
+      <p style='margin-top:16px'><a href="/admin/teams">← Terug</a></p>
+    </div>
+    """
+
+@app.post("/admin/theme")
+def admin_theme_save():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    c1 = (request.form.get("c1") or "#0d9488").strip()
+    c2 = (request.form.get("c2") or "#14b8a6").strip()
+    for c in [c1, c2]:
+        if not (len(c) in (4,7) and c.startswith("#")):
+            return "Ongeldige kleur", 400
+    with db() as conn:
+        conn.execute("INSERT INTO settings(key,value) VALUES('theme_c1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (c1,))
+        conn.execute("INSERT INTO settings(key,value) VALUES('theme_c2',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (c2,))
+    return redirect("/admin/theme")
