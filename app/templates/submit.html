@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Submit flags – CTF{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Submit flags</h1>
+<p class="mb-4">Ingelogd als: <strong>{{ team["name"] }}</strong></p>
+<div class="grid md:grid-cols-2 gap-4">
+  {% for c in challenges %}
+  <div class="border rounded p-4 bg-white">
+    <div class="flex justify-between items-center mb-2">
+      <h2 class="font-semibold">{{ c["title"] }}</h2>
+      <span class="text-xs bg-slate-100 rounded px-2 py-1">{{ c["difficulty"] }} • {{ c["points"] }} pt</span>
+    </div>
+    {% if c["id"] in solved %}
+      <div class="text-green-700">✅ Al opgelost</div>
+    {% else %}
+    <form class="submit-form space-y-2" data-challenge="{{ c["id"] }}">
+      <input name="flag" placeholder="CTF{...}" class="w-full border rounded p-2" required />
+      <button class="bg-cyan-700 text-white px-3 py-1 rounded">Indienen</button>
+      <div class="message text-sm"></div>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+<script src="/static/app.js"></script>
+{% endblock %}

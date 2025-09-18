@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: crypto-ctf
+    env: python
+    plan: free
+    region: frankfurt
+    rootDir: app
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app.wsgi:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: RATE_LIMIT_SUBMIT
+        value: 10 per minute
+      - key: RATE_LIMIT_TEAM
+        value: 60 per hour
