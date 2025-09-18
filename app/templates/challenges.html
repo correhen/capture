@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Challenges{% endblock %}
+
+{% block content %}
+<header class="hero" style="padding: 40px 0 50px;">
+  <div class="container">
+    <h1>📂 Challenges</h1>
+    <p>Overzicht per niveau. Klik door voor downloads & details.</p>
+  </div>
+</header>
+
+<main style="max-width: 960px; margin: 24px auto 60px; padding: 0 20px;">
+  {% for level_slug, lvl in data.items() %}
+    <section class="card" style="margin: 16px 0;">
+      <h2 style="margin: 0 0 6px 0;">{{ lvl.label }}</h2>
+      {% if lvl.challenges %}
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          {% for c in lvl.challenges %}
+            <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;padding:10px 0;">
+              <div>
+                <strong>{{ c.title }}</strong>
+              </div>
+              <div>
+                <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.id) }}">Bekijken</a>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="margin: 12px 0;">(Nog geen challenges in deze categorie)</p>
+      {% endif %}
+    </section>
+  {% endfor %}
+</main>
+{% endblock %}
