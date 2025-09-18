@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eiland-score – Crypto CTF</title>
+<style>
+  :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
+  body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
+  header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
+  header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
+  header>*{ position:relative; z-index:1; }
+  h1 { margin:0; font-size:2rem; }
+  main { max-width:720px; margin:-30px auto 40px; padding:0 20px; }
+  table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
+  th, td { padding:14px 16px; text-align:left; }
+  th { background:#f1f5f9; color:#475569; font-weight:600; font-size:.9rem; border-bottom:1px solid #e2e8f0;}
+  tr:nth-child(even) td { background:#f9fafb; }
+  .nav { margin-top:10px }
+  .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Eiland-ranking (unieke solves)</h1>
+  <div class="nav"><a href="/scoreboard">← Terug naar Scoreboard</a></div>
+</header>
+<main>
+  <table>
+    <thead><tr><th>#</th><th>Eiland</th><th>Unieke challenges</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+        <tr><td>{{ loop.index }}</td><td>{{ r.island }}</td><td>{{ r.solved_unique }}</td></tr>
+      {% else %}
+        <tr><td colspan="3" style="text-align:center;padding:20px">Nog geen solves</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</main>
+</body>
+</html>
