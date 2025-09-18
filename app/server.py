@@ -738,23 +738,25 @@ def admin_upload_flags():
 
     f = request.files.get("file")
     if not f or not f.filename:
-        return "Geen bestand geüpload", 400
+        session["admin_msg"] = "Geen bestand geüpload."
+        return redirect("/admin/challenges")
 
     import io, csv, json, hashlib
     from pathlib import Path
 
-    def sha256_hex(s: str) -> str:
+    def _sha256_hex(s: str) -> str:
         return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
     text = f.read().decode("utf-8", errors="replace")
     mapping = {}
 
-    # detecteer JSON of CSV
+    # Detecteer JSON of CSV
     if f.filename.lower().endswith(".json") or text.strip().startswith("{"):
         try:
             mapping = json.loads(text)
         except Exception:
-            return "Ongeldige JSON", 400
+            session["admin_msg"] = "Ongeldige JSON."
+            return redirect("/admin/challenges")
     else:
         rdr = csv.reader(io.StringIO(text))
         for row in rdr:
@@ -764,12 +766,13 @@ def admin_upload_flags():
                     mapping[ident] = flag
 
     if not mapping:
-        return "Geen geldige regels gevonden", 400
+        session["admin_msg"] = "Geen geldige regels gevonden."
+        return redirect("/admin/challenges")
 
     # challenge-mappen scannen
     CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
-    DIFF_MAP = {"1 - Easy":"makkelijk","2 - Medium":"gemiddeld","3 - Hard":"moeilijk"}
-    POINTS = {"makkelijk":1,"gemiddeld":2,"moeilijk":3}
+    DIFF_MAP = {"1 - Easy": "makkelijk", "2 - Medium": "gemiddeld", "3 - Hard": "moeilijk"}
+    POINTS   = {"makkelijk": 1, "gemiddeld": 2, "moeilijk": 3}
 
     def list_dirs():
         out = []
@@ -783,18 +786,21 @@ def admin_upload_flags():
 
     def match_identifier(identifier: str):
         low = identifier.lower()
+        # exact mapnaam
         for d in dirs:
             if d.name.lower() == low:
                 return d
+            # PDF-bestandsnaam matchen
             for p in d.glob("*.pdf"):
                 if p.stem.lower() == low:
                     return d
+        # fuzzy (substring)
         for d in dirs:
             if low in d.name.lower():
                 return d
         return None
 
-    created_txt, updated_db, unmatched = 0, 0, 0
+    updated_db, unmatched = 0, 0
     with db() as conn:
         for ident, flag in mapping.items():
             d = match_identifier(ident)
@@ -802,11 +808,16 @@ def admin_upload_flags():
                 unmatched += 1
                 continue
 
-            # DB bijwerken
-            fh = sha256_hex(flag)
+            fh   = _sha256_hex(flag)
             diff = DIFF_MAP.get(d.parent.name, "makkelijk")
-            pts = POINTS.get(diff, 1)
-            row = conn.execute("SELECT id FROM challenges WHERE LOWER(title)=LOWER(?)", (d.name.lower(),)).fetchone()
+            pts  = POINTS.get(diff, 1)
+
+            # match op titel == mapnaam (case-insensitive)
+            row = conn.execute(
+                "SELECT id FROM challenges WHERE LOWER(title)=LOWER(?)",
+                (d.name.lower(),)
+            ).fetchone()
+
             if row:
                 conn.execute(
                     "UPDATE challenges SET difficulty=?, points=?, flag_hash=?, is_active=1 WHERE id=?",
@@ -819,29 +830,25 @@ def admin_upload_flags():
                 )
             updated_db += 1
 
-
+    session["admin_msg"] = f"Flags verwerkt: {updated_db} challenges bijgewerkt, {unmatched} niet gematcht."
     return redirect("/admin/challenges")
 
-    @app.post("/admin/cleanup-flags")
+@app.post("/admin/cleanup-flags")
 def admin_cleanup_flags():
     if not admin_logged_in():
         return "Niet ingelogd als admin", 401
+
     from pathlib import Path
     CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
     removed = 0
     for p in CHALL_ROOT.rglob("*"):
-        if p.is_file() and p.name.lower() in {"flag.txt","flag.sha256"}:
+        if p.is_file() and p.name.lower() in {"flag.txt", "flag.sha256"}:
             try:
                 p.unlink()
                 removed += 1
             except Exception:
                 pass
+
     session["admin_msg"] = f"Cleanup klaar — {removed} flag-bestanden verwijderd."
     return redirect("/admin/challenges")
-
-<form method="post" action="/admin/cleanup-flags" style="display:inline-block;margin-left:8px">
-  <button style="padding:8px 12px;background:#ef4444;color:#fff;border:none;border-radius:6px">
-    🧹 Cleanup flags in /static
-  </button>
-</form>
 
