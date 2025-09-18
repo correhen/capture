@@ -1,23 +1,84 @@
-{% extends 'base.html' %}
-{% block title %}Kies je team – CTF{% endblock %}
-{% block content %}
-<h1 class="text-2xl font-semibold mb-4">Kies je team</h1>
-{% if error %}
-  <div class="bg-red-100 text-red-800 p-3 rounded mb-4">{{ error }}</div>
-{% endif %}
-<form action="/join" method="post" class="space-y-4 max-w-md">
-  <label class="block">
-    <span class="text-sm">Teamnaam</span>
-    <select name="team_name" class="w-full border rounded p-2">
-      {% for t in teams %}
-        <option value="{{ t }}">{{ t }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="block">
-    <span class="text-sm">Join code (6 cijfers)</span>
-    <input name="join_code" pattern="\d{6}" required placeholder="123456" class="w-full border rounded p-2" />
-  </label>
-  <button class="bg-cyan-700 text-white px-4 py-2 rounded">Join</button>
-</form>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto CTF – Caribbean Edition</title>
+  <style>
+    body {
+      margin: 0; font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a;
+    }
+    header {
+      background: linear-gradient(135deg, #0d9488, #14b8a6);
+      color: white; text-align: center; padding: 60px 20px 40px;
+    }
+    h1 { font-size: 2.2rem; margin-bottom: .2em; }
+    header p { font-size: 1.1rem; opacity: .9; }
+
+    main {
+      max-width: 800px; margin: -40px auto 60px; padding: 0 20px;
+    }
+    .card {
+      background: white; padding: 24px; border-radius: 16px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 24px;
+    }
+    h2 {
+      margin-top: 0; color: #0f172a; font-size: 1.3rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .3em;
+    }
+    form {
+      display: grid; gap: 12px; margin-top: 12px;
+    }
+    input {
+      padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem;
+    }
+    button {
+      background: #0d9488; color: white; padding: 12px; border: none; border-radius: 8px;
+      font-size: 1rem; cursor: pointer; transition: background .2s;
+    }
+    button:hover { background: #0f766e; }
+    .teams {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;
+    }
+    .team-tag {
+      background: #e0f2fe; color: #0369a1; padding: 6px 12px;
+      border-radius: 999px; font-size: .9rem; font-weight: 500;
+    }
+    .error {
+      background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Crypto CTF – Caribbean Edition</h1>
+    <p>Kraak de code, claim de vlag en versla de andere teams 💥</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Meedoen als team</h2>
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="post" action="/join">
+        <input type="text" name="team_name" placeholder="Teamnaam" required />
+        <input type="text" name="join_code" placeholder="Join-code" required />
+        <button>🚀 Join</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Teams die al meedoen</h2>
+      {% if teams %}
+        <div class="teams">
+          {% for t in teams %}
+            <div class="team-tag">{{ t }}</div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p>Er zijn nog geen teams aangemaakt.</p>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>
