@@ -347,13 +347,6 @@ def admin_teams_page():
         <a href="/admin/backup">🗂 Back-up &amp; Restore</a> &nbsp;•&nbsp;
         <a href="/admin/theme">🎨 Thema</a> &nbsp;•&nbsp;
         <a href="/scoreboard/islands" target="_blank">🌴 Eiland-score</a>
-        <form method="post" action="/admin/upload-flags" enctype="multipart/form-data" style="display:inline-block;margin-left:8px">
-  <label style="display:inline-block;padding:8px 12px;background:#0d9488;color:#fff;border-radius:6px;cursor:pointer">
-    📤 Upload flags.csv/json
-    <input type="file" name="file" accept=".csv,.json" style="display:none" onchange="this.form.submit()">
-  </label>
-</form>
-
       </p>
     </div>
     """
@@ -435,6 +428,22 @@ def admin_challenges_page():
       </div>
     """ if msg else ""
 
+    tools_html = """
+      <div style='display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 20px 0'>
+        <form method="post" action="/admin/cleanup-flags" onsubmit="return confirm('Alle flag-bestanden (flag.txt/flag.sha256) in /static/challenges verwijderen?');">
+          <button style='padding:8px 12px;background:#ef4444;color:#fff;border:none;border-radius:6px'>🧹 Cleanup flags in /static</button>
+        </form>
+
+        <form method="post" action="/admin/upload-flags" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center">
+          <label style="display:inline-block;padding:8px 12px;background:#0d9488;color:#fff;border-radius:6px;cursor:pointer">
+            📤 Upload flags.csv/json
+            <input type="file" name="file" accept=".csv,.json" style="display:none" onchange="this.form.submit()">
+          </label>
+          <span style="color:#64748b;font-size:12px">CSV: &lt;identifier&gt;,&lt;flag&gt; — JSON: {"challenge_mapnaam": "CTF{...}"}</span>
+        </form>
+      </div>
+    """
+
     row_html = ""
     for r in rows:
         checked = "checked" if r["is_active"] else ""
@@ -470,6 +479,7 @@ def admin_challenges_page():
     <div style='font-family:sans-serif;max-width:960px;margin:24px auto'>
       <h2 style='text-align:center;margin:10px 0 16px 0'>Challenges</h2>
       {msg_html}
+      {tools_html}
 
       <table style='border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e8f0;margin-bottom:20px'>
         <thead style='background:#f1f5f9'>
@@ -741,7 +751,7 @@ def admin_upload_flags():
         session["admin_msg"] = "Geen bestand geüpload."
         return redirect("/admin/challenges")
 
-    import io, csv, json, hashlib
+    import io as _io, csv, json as _json, hashlib
     from pathlib import Path
 
     def _sha256_hex(s: str) -> str:
@@ -753,12 +763,12 @@ def admin_upload_flags():
     # Detecteer JSON of CSV
     if f.filename.lower().endswith(".json") or text.strip().startswith("{"):
         try:
-            mapping = json.loads(text)
+            mapping = _json.loads(text)
         except Exception:
             session["admin_msg"] = "Ongeldige JSON."
             return redirect("/admin/challenges")
     else:
-        rdr = csv.reader(io.StringIO(text))
+        rdr = csv.reader(_io.StringIO(text))
         for row in rdr:
             if len(row) >= 2:
                 ident, flag = row[0].strip(), row[1].strip()
@@ -851,4 +861,3 @@ def admin_cleanup_flags():
 
     session["admin_msg"] = f"Cleanup klaar — {removed} flag-bestanden verwijderd."
     return redirect("/admin/challenges")
-
