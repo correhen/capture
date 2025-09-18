@@ -11,15 +11,25 @@ LEVEL_DIRS = {"1 - Easy": "Easy", "2 - Medium": "Medium", "3 - Hard": "Hard"}
 # Bestanden die nooit getoond/gedownload mogen worden
 EXCLUDE_FILENAMES = {"flag.txt", "flag.sha256"}
 
-
 def _is_sensitive_file(path: Path) -> bool:
     name = path.name.lower()
-    if name in EXCLUDE_FILENAMES:
-        return True
-    # extra paranoia: alles dat met 'flag' begint blokkeren
-    if name.startswith("flag."):
+    if name in EXCLUDE_FILENAMES: return True
+    if name.startswith("flag."):  # extra zekerheid
         return True
     return False
+
+def list_files_recursive(ch_dir: Path):
+    items = []
+    for p in ch_dir.rglob("*"):
+        if p.is_file():
+            if ALLOWED and p.suffix.lower() not in ALLOWED:
+                continue
+            if _is_sensitive_file(p):
+                continue
+            rel = p.relative_to(ch_dir).as_posix()
+            items.append((rel, p))
+    return items
+
 
 
 # ====== AUTH: alleen teams die 'ingelogd' zijn ======
@@ -132,3 +142,28 @@ def challenge_bundle(cid):
             zf.write(p, arcname=rel)
     mem.seek(0)
     return send_file(mem, as_attachment=True, download_name=f"{slugify(ch['title'])}.zip")
+
+@ch_bp.route("/download-all")
+def challenges_download_all():
+    # alleen voor ingelogde teams
+    if not is_team_logged_in():
+        return redirect(url_for("submit"))
+    # verzamel alle challenge-mappen
+    all_items = []
+    for ch in list_challenges():   # gebruik jouw bestaande finder; anders loop over ROOT/LEVEL_DIRS
+        for rel, p in list_files_recursive(ch["path"]):
+            # Voor onderscheid per challenge in de zip, prefix met mapnaam:
+            prefixed_rel = f"{ch['title']}/{rel}"
+            all_items.append((prefixed_rel, p))
+
+    if not all_items:
+        abort(404)
+
+    import io, zipfile
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for rel, p in all_items:
+            zf.write(p, arcname=rel)
+    mem.seek(0)
+    return send_file(mem, as_attachment=True, download_name="alle-challenges.zip")
+
