@@ -11,8 +11,7 @@ LEVEL_DIRS = {"1 - Easy": "Easy", "2 - Medium": "Medium", "3 - Hard": "Hard"}
 
 # ====== AUTH: alleen teams die 'ingelogd' zijn ======
 def is_team_logged_in() -> bool:
-    # Pas aan aan jouw app: gebruik wat jij in de sessie zet na 'join'
-    return bool(session.get("team_id") or session.get("team_name"))
+    return bool(session.get("team_token"))
 
 @ch_bp.before_request
 def require_team_login():
