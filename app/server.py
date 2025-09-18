@@ -18,6 +18,8 @@ app.secret_key = SECRET_KEY
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
 
+
+# ----------------------- DB init/seed -----------------------
 def init_db_if_needed():
     with open(os.path.join(BASE_DIR, "schema.sql"), "r", encoding="utf-8") as f:
         schema_sql = f.read()
@@ -48,8 +50,8 @@ def init_db_if_needed():
                     "INSERT OR IGNORE INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?)",
                     (title, diff, flag_hash, points, active)
                 )
-
 init_db_if_needed()
+
 
 def current_team():
     token = session.get("team_token")
@@ -59,7 +61,8 @@ def current_team():
         cur = conn.execute("SELECT * FROM teams WHERE token = ?", (token,))
         return cur.fetchone()
 
-# ---------- Public routes ----------
+
+# ----------------------- Public routes -----------------------
 @app.get("/")
 def home():
     with db() as conn:
@@ -132,12 +135,13 @@ def scoreboard():
 def health():
     return {"status": "ok", "time": int(time.time())}
 
-# ---------- Admin API routes ----------
+
+# ----------------------- Admin APIs (token header) -----------------------
 @app.post("/admin/activate")
 @limiter.limit("30 per hour")
 def admin_activate():
     token = request.headers.get("X-Admin-Token", "")
-    if token != os.getenv("ADMIN_TOKEN", ""):
+    if token != ADMIN_TOKEN:
         abort(401)
     payload = request.get_json(force=True)
     challenge_id = payload.get("challenge_id")
@@ -150,7 +154,7 @@ def admin_activate():
 @limiter.limit("30 per hour")
 def admin_add_team():
     token = request.headers.get("X-Admin-Token", "")
-    if token != os.getenv("ADMIN_TOKEN", ""):
+    if token != ADMIN_TOKEN:
         abort(401)
     payload = request.get_json(force=True)
     name = (payload.get("name") or "").strip()
@@ -165,16 +169,30 @@ def admin_add_team():
 @app.get("/admin/list-teams")
 def admin_list_teams():
     token = request.headers.get("X-Admin-Token", "")
-    if token != os.getenv("ADMIN_TOKEN", ""):
+    if token != ADMIN_TOKEN:
         abort(401)
     with db() as conn:
         rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
     return {"teams": [dict(r) for r in rows]}
 
-# ---------- Admin web (makkelijk) ----------
+
+# ----------------------- Admin web: login helper -----------------------
+def admin_logged_in() -> bool:
+    return session.get("admin_ok") is True
+
+@app.post("/admin/teams/login")
+def admin_teams_login():
+    token = request.form.get("token", "")
+    if token == ADMIN_TOKEN:
+        session["admin_ok"] = True
+        return redirect("/admin/teams")
+    return "Fout token", 401
+
+
+# ----------------------- Admin web: TEAMS -----------------------
 @app.get("/admin/teams")
 def admin_teams_page():
-    if session.get("admin_ok") != True:
+    if not admin_logged_in():
         return """
         <form method='post' action='/admin/teams/login' style='max-width:320px;margin:40px auto;font-family:sans-serif'>
             <h2>Admin login</h2>
@@ -182,75 +200,240 @@ def admin_teams_page():
             <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:4px'>Inloggen</button>
         </form>
         """
+
     with db() as conn:
         rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
 
     last = session.pop("last_join_code", None)
-    last_html = ""
-    if last:
-        last_html = f"""
-        <div style='max-width:520px;margin:16px auto;padding:10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:6px;font-family:sans-serif'>
-          Nieuw team <strong>{last['name']}</strong> — join-code: <strong>{last['join_code']}</strong>
-        </div>
+    msg  = session.pop("admin_msg", None)
+
+    last_html = f"""
+      <div style='margin:12px 0;padding:10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:6px'>
+        Nieuw team <strong>{last['name']}</strong> — join-code: <strong>{last['join_code']}</strong>
+      </div>
+    """ if last else ""
+
+    msg_html = f"""
+      <div style='margin:12px 0;padding:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px'>
+        {msg}
+      </div>
+    """ if msg else ""
+
+    row_html = ""
+    for r in rows:
+        row_html += f"""
+          <tr>
+            <td style='padding:8px 12px'>{r['name']}</td>
+            <td style='padding:8px 12px;font-weight:600'>{r['join_code']}</td>
+            <td style='padding:8px 12px'>
+              <form method="post" action="/admin/teams/delete" onsubmit="return confirm('Team \\'{r['name']}\\' verwijderen? Dit wist ook hun solves.');" style="display:inline">
+                <input type="hidden" name="name" value="{r['name']}"/>
+                <button style='padding:6px 10px;background:#ef4444;color:#fff;border:none;border-radius:6px'>Verwijderen</button>
+              </form>
+            </td>
+          </tr>
         """
 
-    rows_html = "".join(f"<tr><td style='padding:6px 12px'>{r['name']}</td><td style='padding:6px 12px;font-weight:600'>{r['join_code']}</td></tr>" for r in rows)
-
     return f"""
-    <div style='font-family:sans-serif;max-width:800px;margin:24px auto'>
-      <h2 style='text-align:center;margin:10px 0 16px 0'>Teamcodes</h2>
+    <div style='font-family:sans-serif;max-width:960px;margin:24px auto'>
+      <h2 style='text-align:center;margin:10px 0 16px 0'>Teambeheer</h2>
+      {msg_html}
       {last_html}
+
+      <div style='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0 16px 0'>
+        <form method="post" action="/admin/reset-all" onsubmit="return confirm('Weet je zeker dat je ALLE scores en solves wilt wissen?');">
+          <button style='padding:8px 12px;background:#0f172a;color:#fff;border:none;border-radius:6px'>Scorebord resetten</button>
+        </form>
+
+        <form method="post" action="/admin/teams/add" style='display:flex;gap:8px;align-items:center'>
+          <input name="name" placeholder="Nieuw teamnaam" required
+                 style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+          <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px'>Toevoegen</button>
+        </form>
+      </div>
+
       <table style='border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e8f0'>
         <thead style='background:#f1f5f9'>
           <tr>
             <th style='text-align:left;padding:8px 12px'>Team</th>
             <th style='text-align:left;padding:8px 12px'>Join-code</th>
+            <th style='text-align:left;padding:8px 12px'>Acties</th>
           </tr>
         </thead>
         <tbody>
-          {rows_html}
+          {row_html or "<tr><td colspan='3' style='padding:12px'>Nog geen teams</td></tr>"}
         </tbody>
       </table>
 
-      <hr style='margin:24px 0;border:none;border-top:1px solid #e2e8f0' />
+      <p style='color:#64748b;font-size:12px;margin-top:6px'>Verwijderen wist ook alle solves van dat team.</p>
 
-      <h3>Nieuw team toevoegen</h3>
-      <form method="post" action="/admin/teams/add" style='display:flex;gap:8px;align-items:center;margin-top:8px'>
-        <input name="name" placeholder="Teamnaam" required
-               style='flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
-        <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px'>Toevoegen</button>
-      </form>
-
-      <p style='color:#64748b;font-size:12px;margin-top:6px'>Na toevoegen verschijnt de join-code hierboven in een blauwe melding.</p>
+      <hr style='margin:28px 0;border:none;border-top:1px solid #e2e8f0' />
+      <p><a href="/admin/challenges">👉 Ga naar Challenges-beheer</a></p>
     </div>
     """
 
-@app.post("/admin/teams/login")
-def admin_teams_login():
-    token = request.form.get("token", "")
-    if token == os.getenv("ADMIN_TOKEN", ""):
-        session["admin_ok"] = True
-        return redirect("/admin/teams")
-    return "Fout token", 401
+@app.post("/admin/reset-all")
+def admin_reset_all():
+    if not (admin_logged_in() or request.headers.get("X-Admin-Token") == ADMIN_TOKEN):
+        return "Niet ingelogd als admin", 401
+    with db() as conn:
+        conn.execute("DELETE FROM solves")
+        conn.execute("UPDATE teams SET score = 0")
+    session["admin_msg"] = "Alle scores en solves zijn gewist."
+    return redirect("/admin/teams")
 
 @app.post("/admin/teams/add")
 def admin_teams_add():
-    if session.get("admin_ok") != True:
+    if not admin_logged_in():
         return "Niet ingelogd als admin", 401
     name = (request.form.get("name") or "").strip()
     if not name:
-        return "Teamnaam verplicht", 400
+        session["admin_msg"] = "Teamnaam verplicht."
+        return redirect("/admin/teams")
 
     join_code = str(secrets.randbelow(900000) + 100000)
     ttoken = secrets.token_urlsafe(24)
     try:
         with db() as conn:
-            conn.execute(
-                "INSERT INTO teams(name, join_code, token) VALUES(?,?,?)",
-                (name, join_code, ttoken)
-            )
+            conn.execute("INSERT INTO teams(name, join_code, token) VALUES(?,?,?)", (name, join_code, ttoken))
+        session["last_join_code"] = {"name": name, "join_code": join_code}
     except Exception as e:
-        return f"Kon team niet toevoegen: {e}", 400
-
-    session["last_join_code"] = {"name": name, "join_code": join_code}
+        session["admin_msg"] = f"Kon team niet toevoegen: {e}"
     return redirect("/admin/teams")
+
+@app.post("/admin/teams/delete")
+def admin_teams_delete():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        session["admin_msg"] = "Teamnaam ontbreekt."
+        return redirect("/admin/teams")
+    with db() as conn:
+        # cascades verwijderen solves (foreign key ON DELETE CASCADE in schema)
+        cur = conn.execute("DELETE FROM teams WHERE name = ?", (name,))
+        if cur.rowcount == 0:
+            session["admin_msg"] = f"Team '{name}' niet gevonden."
+        else:
+            session["admin_msg"] = f"Team '{name}' verwijderd."
+    return redirect("/admin/teams")
+
+
+# ----------------------- Admin web: CHALLENGES -----------------------
+@app.get("/admin/challenges")
+def admin_challenges_page():
+    if not admin_logged_in():
+        return redirect("/admin/teams")
+
+    with db() as conn:
+        rows = conn.execute("SELECT id, title, difficulty, points, is_active FROM challenges ORDER BY id ASC").fetchall()
+
+    msg = session.pop("admin_msg", None)
+    msg_html = f"""
+      <div style='margin:12px 0;padding:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px'>
+        {msg}
+      </div>
+    """ if msg else ""
+
+    # rijen met toggle
+    row_html = ""
+    for r in rows:
+        checked = "checked" if r["is_active"] else ""
+        row_html += f"""
+          <tr>
+            <td style='padding:8px 12px'>{r['id']}</td>
+            <td style='padding:8px 12px'>{r['title']}</td>
+            <td style='padding:8px 12px'>{r['difficulty']} ({r['points']} pt)</td>
+            <td style='padding:8px 12px'>
+              <form method="post" action="/admin/challenges/toggle" style="display:inline">
+                <input type="hidden" name="id" value="{r['id']}"/>
+                <label style="display:flex;align-items:center;gap:8px">
+                  <input type="checkbox" name="active" value="1" {checked} onchange="this.form.submit()"/>
+                  <span>{'Actief' if r['is_active'] else 'Uit'}</span>
+                </label>
+              </form>
+            </td>
+          </tr>
+        """
+
+    # formulier challenge toevoegen
+    diff_options = "".join(
+        f"<option value='{k}'>{k} ({v} pt)</option>" for k, v in DIFFICULTY_POINTS.items()
+    )
+
+    return f"""
+    <div style='font-family:sans-serif;max-width:960px;margin:24px auto'>
+      <h2 style='text-align:center;margin:10px 0 16px 0'>Challenges</h2>
+      {msg_html}
+
+      <table style='border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e8f0;margin-bottom:20px'>
+        <thead style='background:#f1f5f9'>
+          <tr>
+            <th style='text-align:left;padding:8px 12px'>ID</th>
+            <th style='text-align:left;padding:8px 12px'>Titel</th>
+            <th style='text-align:left;padding:8px 12px'>Moeilijkheid (pt)</th>
+            <th style='text-align:left;padding:8px 12px'>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {row_html or "<tr><td colspan='4' style='padding:12px'>Nog geen challenges</td></tr>"}
+        </tbody>
+      </table>
+
+      <h3>Nieuwe challenge toevoegen</h3>
+      <form method="post" action="/admin/challenges/add" style='display:grid;grid-template-columns:1fr 160px 1fr auto;gap:8px;align-items:center'>
+        <input name="title" placeholder="Titel" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <select name="difficulty" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px'>
+          {diff_options}
+        </select>
+        <input name="flag" placeholder="CTF{...}" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <label style='display:flex;gap:6px;align-items:center;'>
+          <input type="checkbox" name="active" value="1" checked />
+          Actief
+        </label>
+        <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px;grid-column:1/-1;justify-self:start'>Toevoegen</button>
+      </form>
+
+      <p style='margin-top:16px'><a href="/admin/teams">← Terug naar Teambeheer</a></p>
+    </div>
+    """
+
+@app.post("/admin/challenges/toggle")
+def admin_challenges_toggle():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    cid = request.form.get("id")
+    is_active = 1 if request.form.get("active") == "1" else 0
+    with db() as conn:
+        conn.execute("UPDATE challenges SET is_active=? WHERE id=?", (is_active, cid))
+    session["admin_msg"] = f"Challenge {cid} {'geactiveerd' if is_active else 'uitgeschakeld'}."
+    return redirect("/admin/challenges")
+
+@app.post("/admin/challenges/add")
+def admin_challenges_add():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    title = (request.form.get("title") or "").strip()
+    difficulty = (request.form.get("difficulty") or "").strip()
+    flag = (request.form.get("flag") or "").strip()
+    is_active = 1 if request.form.get("active") == "1" else 0
+
+    if not title or not difficulty or not flag:
+        session["admin_msg"] = "Titel, difficulty en flag zijn verplicht."
+        return redirect("/admin/challenges")
+    if difficulty not in DIFFICULTY_POINTS:
+        session["admin_msg"] = f"Onbekende difficulty: {difficulty}"
+        return redirect("/admin/challenges")
+    if not (flag.startswith("CTF{") and flag.endswith("}")):
+        session["admin_msg"] = "Flag moet de vorm CTF{...} hebben."
+        return redirect("/admin/challenges")
+
+    points = DIFFICULTY_POINTS[difficulty]
+    fhash = sha256_hex(flag)
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?)",
+            (title, difficulty, fhash, points, is_active)
+        )
+    session["admin_msg"] = f"Challenge '{title}' toegevoegd."
+    return redirect("/admin/challenges")
