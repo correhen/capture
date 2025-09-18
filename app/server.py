@@ -802,13 +802,6 @@ def admin_upload_flags():
                 unmatched += 1
                 continue
 
-            # flag.txt schrijven
-            try:
-                (d / "flag.txt").write_text(flag + "\n", encoding="utf-8")
-                created_txt += 1
-            except Exception:
-                pass
-
             # DB bijwerken
             fh = sha256_hex(flag)
             diff = DIFF_MAP.get(d.parent.name, "makkelijk")
@@ -826,5 +819,29 @@ def admin_upload_flags():
                 )
             updated_db += 1
 
-    session["admin_msg"] = f"Flags verwerkt — {created_txt} flag.txt geschreven, {updated_db} DB-updates, {unmatched} niet gevonden."
+
     return redirect("/admin/challenges")
+
+    @app.post("/admin/cleanup-flags")
+def admin_cleanup_flags():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    from pathlib import Path
+    CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
+    removed = 0
+    for p in CHALL_ROOT.rglob("*"):
+        if p.is_file() and p.name.lower() in {"flag.txt","flag.sha256"}:
+            try:
+                p.unlink()
+                removed += 1
+            except Exception:
+                pass
+    session["admin_msg"] = f"Cleanup klaar — {removed} flag-bestanden verwijderd."
+    return redirect("/admin/challenges")
+
+<form method="post" action="/admin/cleanup-flags" style="display:inline-block;margin-left:8px">
+  <button style="padding:8px 12px;background:#ef4444;color:#fff;border:none;border-radius:6px">
+    🧹 Cleanup flags in /static
+  </button>
+</form>
+
