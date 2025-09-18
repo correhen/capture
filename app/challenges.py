@@ -8,6 +8,19 @@ ch_bp = Blueprint("ch", __name__)
 ROOT = Path(__file__).resolve().parent / "static" / "challenges"
 ALLOWED = {".pdf", ".txt", ".zip", ".pcap", ".pcapng", ".json", ".png", ".jpg", ".jpeg"}
 LEVEL_DIRS = {"1 - Easy": "Easy", "2 - Medium": "Medium", "3 - Hard": "Hard"}
+# Bestanden die nooit getoond/gedownload mogen worden
+EXCLUDE_FILENAMES = {"flag.txt", "flag.sha256"}
+
+
+def _is_sensitive_file(path: Path) -> bool:
+    name = path.name.lower()
+    if name in EXCLUDE_FILENAMES:
+        return True
+    # extra paranoia: alles dat met 'flag' begint blokkeren
+    if name.startswith("flag."):
+        return True
+    return False
+
 
 # ====== AUTH: alleen teams die 'ingelogd' zijn ======
 def is_team_logged_in() -> bool:
@@ -60,6 +73,21 @@ def list_files_recursive(ch_path: Path):
     files.sort()
     return files
 
+def list_files_recursive(ch_dir: Path):
+    items = []
+    for p in ch_dir.rglob("*"):
+        if p.is_file():
+            # bestaand ALLOWED-filter, laat die staan
+            if ALLOWED and p.suffix.lower() not in ALLOWED:
+                continue
+            # NIEUW: blokkeer flags
+            if _is_sensitive_file(p):
+                continue
+            rel = p.relative_to(ch_dir).as_posix()
+            items.append((rel, p))
+    return items
+
+
 # ====== routes ======
 @ch_bp.route("/challenges")
 def challenges_index():
@@ -90,6 +118,9 @@ def challenge_download(cid, relpath):
 @ch_bp.route("/download-bundle/<cid>")
 def challenge_bundle(cid):
     ch = find_challenge(cid)
+    if _is_sensitive_file((ch["path"] / relpath).resolve()):
+    abort(403)  # nope
+
     if not ch:
         abort(404)
     items = list_files_recursive(ch["path"])
