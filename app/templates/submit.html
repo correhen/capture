@@ -1,26 +1,64 @@
-{% extends 'base.html' %}
-{% block title %}Submit flags – CTF{% endblock %}
-{% block content %}
-<h1 class="text-2xl font-semibold mb-4">Submit flags</h1>
-<p class="mb-4">Ingelogd als: <strong>{{ team["name"] }}</strong></p>
-<div class="grid md:grid-cols-2 gap-4">
-  {% for c in challenges %}
-  <div class="border rounded p-4 bg-white">
-    <div class="flex justify-between items-center mb-2">
-      <h2 class="font-semibold">{{ c["title"] }}</h2>
-      <span class="text-xs bg-slate-100 rounded px-2 py-1">{{ c["difficulty"] }} • {{ c["points"] }} pt</span>
-    </div>
-    {% if c["id"] in solved %}
-      <div class="text-green-700">✅ Al opgelost</div>
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Challenges – Crypto CTF</title>
+  <style>
+    body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
+    header { background:linear-gradient(135deg,#0d9488,#14b8a6); color:white; padding:40px 20px; text-align:center; }
+    h1 { margin:0; font-size:2rem; }
+    main { max-width:900px; margin: -30px auto 40px; padding:0 20px; }
+    .card { background:white; border-radius:16px; padding:24px; margin-bottom:20px; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
+    .title { font-size:1.2rem; font-weight:600; margin-bottom:6px; }
+    .badge {
+      display:inline-block; padding:4px 10px; border-radius:999px; font-size:.8rem;
+      background:#e0f2fe; color:#0369a1; margin-left:6px;
+    }
+    form { display:flex; gap:8px; margin-top:12px; }
+    input { flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:8px; }
+    button {
+      background:#0d9488; color:white; border:none; border-radius:8px; padding:10px 14px; cursor:pointer;
+    }
+    .solved { background:#dcfce7; color:#166534; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Challenges</h1>
+    <p>Team: {{ team.name }}</p>
+  </header>
+  <main>
+    {% for c in challenges %}
+      <div class="card">
+        <div class="title">{{ c.title }}
+          <span class="badge">{{ c.difficulty }} – {{ c.points }} pt</span>
+          {% if c.id in solved %}
+            <span class="badge solved">✔️ Opgelost</span>
+          {% endif %}
+        </div>
+        {% if c.id not in solved %}
+          <form method="post" action="/api/submit" onsubmit="return submitFlag(event, {{ c.id }})">
+            <input type="text" name="flag" placeholder="CTF{...}" required>
+            <button>Submit</button>
+          </form>
+        {% endif %}
+      </div>
     {% else %}
-    <form class="submit-form space-y-2" data-challenge="{{ c["id"] }}">
-      <input name="flag" placeholder="CTF{...}" class="w-full border rounded p-2" required />
-      <button class="bg-cyan-700 text-white px-3 py-1 rounded">Indienen</button>
-      <div class="message text-sm"></div>
-    </form>
-    {% endif %}
-  </div>
-  {% endfor %}
-</div>
-<script src="/static/app.js"></script>
-{% endblock %}
+      <p>Er zijn nog geen actieve challenges.</p>
+    {% endfor %}
+  </main>
+  <script>
+    async function submitFlag(e, cid) {
+      e.preventDefault();
+      const form = e.target;
+      const fd = new FormData(form);
+      fd.append("challenge_id", cid);
+      const res = await fetch("/api/submit", { method:"POST", body: fd });
+      const data = await res.json();
+      alert(data.message || "Ingediend");
+      if (data.correct) location.reload();
+    }
+  </script>
+</body>
+</html>
