@@ -1,25 +1,23 @@
 from __future__ import annotations
-import os, time, json, secrets
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort
+import os, time, json, secrets, io, datetime
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort, send_file
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from database import db
 from models import sha256_hex, DIFFICULTY_POINTS
 
+# -------- Config --------
 SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24))
 RATE_LIMIT_SUBMIT = os.getenv("RATE_LIMIT_SUBMIT", "10 per minute")
 RATE_LIMIT_TEAM = os.getenv("RATE_LIMIT_TEAM", "60 per hour")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
-
 BASE_DIR = os.path.dirname(__file__)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
-
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
 
-
-# ----------------------- DB init/seed -----------------------
+# -------- DB init/seed --------
 def init_db_if_needed():
     with open(os.path.join(BASE_DIR, "schema.sql"), "r", encoding="utf-8") as f:
         schema_sql = f.read()
@@ -37,7 +35,8 @@ def init_db_if_needed():
                 name = t["name"].strip()
                 token = secrets.token_urlsafe(24)
                 join_code = str(secrets.randbelow(900000) + 100000)
-                cur.execute("INSERT OR IGNORE INTO teams(name, join_code, token) VALUES(?,?,?)", (name, join_code, token))
+                cur.execute("INSERT OR IGNORE INTO teams(name, join_code, token) VALUES(?,?,?)",
+                            (name, join_code, token))
             for cobj in chals:
                 title = cobj["title"].strip()
                 diff = cobj["difficulty"].strip()
@@ -52,7 +51,6 @@ def init_db_if_needed():
                 )
 init_db_if_needed()
 
-
 def current_team():
     token = session.get("team_token")
     if not token:
@@ -61,8 +59,10 @@ def current_team():
         cur = conn.execute("SELECT * FROM teams WHERE token = ?", (token,))
         return cur.fetchone()
 
+def admin_logged_in() -> bool:
+    return session.get("admin_ok") is True
 
-# ----------------------- Public routes -----------------------
+# -------- Public routes --------
 @app.get("/")
 def home():
     with db() as conn:
@@ -90,8 +90,12 @@ def submit():
     if not team:
         return redirect(url_for("home"))
     with db() as conn:
-        challenges = conn.execute("SELECT id, title, difficulty, points FROM challenges WHERE is_active=1 ORDER BY id ASC").fetchall()
-        solved = {r["challenge_id"] for r in conn.execute("SELECT challenge_id FROM solves WHERE team_id=?", (team["id"],)).fetchall()}
+        challenges = conn.execute(
+            "SELECT id, title, difficulty, points FROM challenges WHERE is_active=1 ORDER BY id ASC"
+        ).fetchall()
+        solved = {r["challenge_id"] for r in conn.execute(
+            "SELECT challenge_id FROM solves WHERE team_id=?", (team["id"],)
+        ).fetchall()}
     return render_template("submit.html", team=team, challenges=challenges, solved=solved)
 
 @app.post("/api/submit")
@@ -109,12 +113,16 @@ def api_submit():
 
     flagh = sha256_hex(flag)
     with db() as conn:
-        chal = conn.execute("SELECT id, title, points, flag_hash FROM challenges WHERE id=? AND is_active=1", (challenge_id,)).fetchone()
+        chal = conn.execute(
+            "SELECT id, title, points, flag_hash FROM challenges WHERE id=? AND is_active=1", (challenge_id,)
+        ).fetchone()
         if not chal:
             return jsonify({"ok": False, "error": "Challenge niet gevonden of inactief."}), 404
         if flagh != chal["flag_hash"]:
             return jsonify({"ok": True, "correct": False, "message": "Helaas, dat is niet de juiste flag."})
-        existing = conn.execute("SELECT 1 FROM solves WHERE team_id=? AND challenge_id=?", (team["id"], chal["id"])).fetchone()
+        existing = conn.execute(
+            "SELECT 1 FROM solves WHERE team_id=? AND challenge_id=?", (team["id"], chal["id"])
+        ).fetchone()
         if existing:
             return jsonify({"ok": True, "correct": True, "message": "Al opgelost — geen extra punten."})
         cur = conn.cursor()
@@ -135,8 +143,7 @@ def scoreboard():
 def health():
     return {"status": "ok", "time": int(time.time())}
 
-
-# ----------------------- Admin APIs (token header) -----------------------
+# -------- Admin APIs (met header-token) --------
 @app.post("/admin/activate")
 @limiter.limit("30 per hour")
 def admin_activate():
@@ -175,11 +182,7 @@ def admin_list_teams():
         rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
     return {"teams": [dict(r) for r in rows]}
 
-
-# ----------------------- Admin web: login helper -----------------------
-def admin_logged_in() -> bool:
-    return session.get("admin_ok") is True
-
+# -------- Admin web: login --------
 @app.post("/admin/teams/login")
 def admin_teams_login():
     token = request.form.get("token", "")
@@ -188,8 +191,7 @@ def admin_teams_login():
         return redirect("/admin/teams")
     return "Fout token", 401
 
-
-# ----------------------- Admin web: TEAMS -----------------------
+# -------- Admin web: TEAMS --------
 @app.get("/admin/teams")
 def admin_teams_page():
     if not admin_logged_in():
@@ -265,10 +267,15 @@ def admin_teams_page():
         </tbody>
       </table>
 
-      <p style='color:#64748b;font-size:12px;margin-top:6px'>Verwijderen wist ook alle solves van dat team.</p>
+      <p style='color:#64748b;font-size:12px;margin-top:12px'>
+        Verwijderen wist ook alle solves van dat team.
+      </p>
 
       <hr style='margin:28px 0;border:none;border-top:1px solid #e2e8f0' />
-      <p><a href="/admin/challenges">👉 Ga naar Challenges-beheer</a></p>
+      <p>
+        <a href="/admin/challenges">👉 Challenges-beheer</a> &nbsp;•&nbsp;
+        <a href="/admin/backup">🗂 Back-up &amp; Restore</a>
+      </p>
     </div>
     """
 
@@ -283,7 +290,7 @@ def admin_reset_all():
     return redirect("/admin/teams")
 
 @app.post("/admin/teams/add")
-def admin_teams_add():
+def admin_teams_add_web():
     if not admin_logged_in():
         return "Niet ingelogd als admin", 401
     name = (request.form.get("name") or "").strip()
@@ -310,7 +317,6 @@ def admin_teams_delete():
         session["admin_msg"] = "Teamnaam ontbreekt."
         return redirect("/admin/teams")
     with db() as conn:
-        # cascades verwijderen solves (foreign key ON DELETE CASCADE in schema)
         cur = conn.execute("DELETE FROM teams WHERE name = ?", (name,))
         if cur.rowcount == 0:
             session["admin_msg"] = f"Team '{name}' niet gevonden."
@@ -318,8 +324,7 @@ def admin_teams_delete():
             session["admin_msg"] = f"Team '{name}' verwijderd."
     return redirect("/admin/teams")
 
-
-# ----------------------- Admin web: CHALLENGES -----------------------
+# -------- Admin web: CHALLENGES --------
 @app.get("/admin/challenges")
 def admin_challenges_page():
     if not admin_logged_in():
@@ -335,7 +340,6 @@ def admin_challenges_page():
       </div>
     """ if msg else ""
 
-    # rijen met toggle
     row_html = ""
     for r in rows:
         checked = "checked" if r["is_active"] else ""
@@ -356,7 +360,6 @@ def admin_challenges_page():
           </tr>
         """
 
-    # formulier challenge toevoegen
     diff_options = "".join(
         f"<option value='{k}'>{k} ({v} pt)</option>" for k, v in DIFFICULTY_POINTS.items()
     )
@@ -386,7 +389,7 @@ def admin_challenges_page():
         <select name="difficulty" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px'>
           {diff_options}
         </select>
-        <input name="flag" placeholder="CTF{...}" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <input name="flag" placeholder="CTF{{...}}" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
         <label style='display:flex;gap:6px;align-items:center;'>
           <input type="checkbox" name="active" value="1" checked />
           Actief
@@ -394,7 +397,10 @@ def admin_challenges_page():
         <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px;grid-column:1/-1;justify-self:start'>Toevoegen</button>
       </form>
 
-      <p style='margin-top:16px'><a href="/admin/teams">← Terug naar Teambeheer</a></p>
+      <p style='margin-top:16px'>
+        <a href="/admin/teams">← Terug naar Teambeheer</a> &nbsp;•&nbsp;
+        <a href="/admin/backup">🗂 Back-up &amp; Restore</a>
+      </p>
     </div>
     """
 
@@ -437,3 +443,120 @@ def admin_challenges_add():
         )
     session["admin_msg"] = f"Challenge '{title}' toegevoegd."
     return redirect("/admin/challenges")
+
+# -------- Admin web: BACKUP / RESTORE --------
+@app.get("/admin/backup")
+def admin_backup_page():
+    if not admin_logged_in():
+        return redirect("/admin/teams")
+    msg  = session.pop("admin_msg", None)
+    msg_html = f"""
+      <div style='margin:12px 0;padding:10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px'>
+        {msg}
+      </div>
+    """ if msg else ""
+
+    return f"""
+    <div style='font-family:sans-serif;max-width:760px;margin:24px auto'>
+      <h2 style='text-align:center;margin:10px 0 16px 0'>Back-up &amp; Restore</h2>
+      {msg_html}
+
+      <div style='display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 24px 0'>
+        <form method="get" action="/admin/backup/export">
+          <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px'>⬇️ Exporteren (JSON)</button>
+        </form>
+      </div>
+
+      <h3>Restore (JSON importeren)</h3>
+      <form method="post" action="/admin/backup/import" enctype="multipart/form-data" style='display:flex;gap:8px;align-items:center;margin-top:8px'>
+        <input type="file" name="file" accept="application/json" required
+               style='flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff' />
+        <label style='display:flex;gap:6px;align-items:center;'>
+          <input type="checkbox" name="replace" value="1" checked />
+          Bestaande data eerst wissen (aanbevolen)
+        </label>
+        <button style='padding:8px 12px;background:#0f172a;color:#fff;border:none;border-radius:6px'>⬆️ Importeren</button>
+      </form>
+
+      <p style='color:#64748b;font-size:12px;margin-top:6px'>
+        Tip: gebruik alleen exports van deze CTF-app (zelfde database-structuur).
+      </p>
+
+      <p style='margin-top:16px'>
+        <a href="/admin/teams">← Terug naar Teambeheer</a> &nbsp;•&nbsp;
+        <a href="/admin/challenges">Challenges</a>
+      </p>
+    </div>
+    """
+
+@app.get("/admin/backup/export")
+def admin_backup_export():
+    if not (admin_logged_in() or request.headers.get("X-Admin-Token") == ADMIN_TOKEN):
+        return "Niet ingelogd als admin", 401
+
+    with db() as conn:
+        teams = [dict(r) for r in conn.execute("SELECT id, name, join_code, token, score FROM teams ORDER BY id").fetchall()]
+        chals = [dict(r) for r in conn.execute("SELECT id, title, difficulty, flag_hash, points, is_active FROM challenges ORDER BY id").fetchall()]
+        solves = [dict(r) for r in conn.execute("SELECT id, team_id, challenge_id FROM solves ORDER BY id").fetchall()]
+
+    payload = {
+        "meta": {
+            "version": 1,
+            "exported_at": datetime.datetime.utcnow().isoformat() + "Z"
+        },
+        "teams": teams,
+        "challenges": chals,
+        "solves": solves
+    }
+    data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    buf = io.BytesIO(data)
+    fname = "ctf-backup-" + datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S") + ".json"
+    return send_file(buf, mimetype="application/json", as_attachment=True, download_name=fname)
+
+@app.post("/admin/backup/import")
+def admin_backup_import():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+    f = request.files.get("file")
+    if not f:
+        session["admin_msg"] = "Geen bestand gekozen."
+        return redirect("/admin/backup")
+
+    try:
+        payload = json.loads(f.read().decode("utf-8"))
+    except Exception as e:
+        session["admin_msg"] = f"Kon JSON niet lezen: {e}"
+        return redirect("/admin/backup")
+
+    teams = payload.get("teams", [])
+    chals = payload.get("challenges", [])
+    solves = payload.get("solves", [])
+    replace = request.form.get("replace") == "1"
+
+    try:
+        with db() as conn:
+            cur = conn.cursor()
+            if replace:
+                cur.execute("DELETE FROM solves")
+                cur.execute("DELETE FROM teams")
+                cur.execute("DELETE FROM challenges")
+            for t in teams:
+                cur.execute(
+                    "INSERT OR REPLACE INTO teams(id, name, join_code, token, score) VALUES(?,?,?,?,?)",
+                    (t.get("id"), t.get("name"), t.get("join_code"), t.get("token"), t.get("score", 0))
+                )
+            for c in chals:
+                cur.execute(
+                    "INSERT OR REPLACE INTO challenges(id, title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?,?)",
+                    (c.get("id"), c.get("title"), c.get("difficulty"), c.get("flag_hash"), c.get("points"), c.get("is_active", 1))
+                )
+            for s in solves:
+                cur.execute(
+                    "INSERT OR REPLACE INTO solves(id, team_id, challenge_id) VALUES(?,?,?)",
+                    (s.get("id"), s.get("team_id"), s.get("challenge_id"))
+                )
+        session["admin_msg"] = "Import voltooid."
+    except Exception as e:
+        session["admin_msg"] = f"Import mislukt: {e}"
+
+    return redirect("/admin/backup")
