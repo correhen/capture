@@ -5,47 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto CTF – Caribbean Edition</title>
   <style>
-    body {
-      margin: 0; font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a;
-    }
+    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
+    body { margin:0; font-family: system-ui, sans-serif; background:#f8fafc; color:#0f172a; }
     header {
-      background: linear-gradient(135deg, #0d9488, #14b8a6);
-      color: white; text-align: center; padding: 60px 20px 40px;
+      position:relative; color: white; text-align: center; padding: 60px 20px 40px;
+      background: linear-gradient(135deg, var(--c1), var(--c2));
     }
+    header::before{
+      content:""; position:absolute; inset:0;
+      background:url('/static/hero-caribbean.jpg') center/cover no-repeat;
+      opacity:.25; mix-blend:overlay;
+    }
+    header>*{ position:relative; z-index:1; }
     h1 { font-size: 2.2rem; margin-bottom: .2em; }
-    header p { font-size: 1.1rem; opacity: .9; }
-
-    main {
-      max-width: 800px; margin: -40px auto 60px; padding: 0 20px;
-    }
-    .card {
-      background: white; padding: 24px; border-radius: 16px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 24px;
-    }
-    h2 {
-      margin-top: 0; color: #0f172a; font-size: 1.3rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .3em;
-    }
-    form {
-      display: grid; gap: 12px; margin-top: 12px;
-    }
-    input {
-      padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem;
-    }
-    button {
-      background: #0d9488; color: white; padding: 12px; border: none; border-radius: 8px;
-      font-size: 1rem; cursor: pointer; transition: background .2s;
-    }
-    button:hover { background: #0f766e; }
-    .teams {
-      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;
-    }
-    .team-tag {
-      background: #e0f2fe; color: #0369a1; padding: 6px 12px;
-      border-radius: 999px; font-size: .9rem; font-weight: 500;
-    }
-    .error {
-      background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 10px;
-    }
+    header p { font-size: 1.1rem; opacity: .95; }
+    main { max-width: 900px; margin: -40px auto 60px; padding: 0 20px; }
+    .card { background: white; padding: 24px; border-radius: 16px; box-shadow:0 4px 8px rgba(0,0,0,0.05); margin-bottom: 24px; }
+    h2 { margin-top: 0; font-size: 1.3rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .3em; }
+    form { display: grid; gap: 12px; margin-top: 12px; }
+    input { padding: 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; }
+    button { background: var(--c1); color:white; padding: 12px; border:none; border-radius:8px; font-size:1rem; cursor:pointer; }
+    button:hover { filter: brightness(.95); }
+    .teams { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+    .team-tag { background:#e0f2fe; color:#0369a1; padding:8px 12px; border-radius:999px; font-weight:600; border:1px solid #bae6fd; cursor:pointer; }
+    .error { background:#fee2e2; color:#b91c1c; padding:10px; border-radius:8px; margin-bottom:10px; }
   </style>
 </head>
 <body>
@@ -53,13 +36,10 @@
     <h1>Crypto CTF – Caribbean Edition</h1>
     <p>Kraak de code, claim de vlag en versla de andere teams 💥</p>
   </header>
-
   <main>
     <div class="card">
       <h2>Meedoen als team</h2>
-      {% if error %}
-        <div class="error">{{ error }}</div>
-      {% endif %}
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
       <form method="post" action="/join">
         <input type="text" name="team_name" placeholder="Teamnaam" required />
         <input type="text" name="join_code" placeholder="Join-code" required />
@@ -72,7 +52,7 @@
       {% if teams %}
         <div class="teams">
           {% for t in teams %}
-            <div class="team-tag">{{ t }}</div>
+            <button type="button" class="team-tag" onclick="prefill('{{ t|e }}')">{{ t }}</button>
           {% endfor %}
         </div>
       {% else %}
@@ -80,5 +60,11 @@
       {% endif %}
     </div>
   </main>
+  <script>
+    function prefill(name){
+      const input = document.querySelector('input[name="team_name"]');
+      if(input){ input.value = name; input.focus(); window.scrollTo({top:0, behavior:'smooth'}); }
+    }
+  </script>
 </body>
 </html>
