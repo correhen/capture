@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scoreboard – Crypto CTF</title>
   <style>
+    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
     body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
-    header { background:linear-gradient(135deg,#0d9488,#14b8a6); color:white; padding:40px 20px; text-align:center; }
+    header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
+    header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
+    header>*{ position:relative; z-index:1; }
     h1 { margin:0; font-size:2rem; }
     main { max-width:800px; margin:-30px auto 40px; padding:0 20px; }
     table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
@@ -15,24 +18,33 @@
     tr:nth-child(even) td { background:#f9fafb; }
     .score { font-weight:600; color:#0d9488; }
     .solves { font-size:.85rem; color:#64748b; }
+    .nav { margin-top:10px }
+    .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; margin:0 4px; }
   </style>
 </head>
 <body>
   <header>
     <h1>Scoreboard</h1>
+    <div class="nav">
+      <a href="/submit">🚀 Naar challenges</a>
+      <a href="/scoreboard/islands">🌴 Eiland-ranking</a>
+    </div>
   </header>
   <main>
     <table>
       <thead>
-        <tr>
-          <th>#</th><th>Team</th><th>Score</th><th>Challenges</th>
-        </tr>
+        <tr><th>#</th><th>Team</th><th>Score</th><th>Challenges</th></tr>
       </thead>
       <tbody>
         {% for t in teams %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td>{{ t.name }}</td>
+            <td>
+              {% if t.logo %}
+                <img src="{{ t.logo }}" alt="logo" style="width:22px;height:22px;object-fit:cover;border-radius:5px;vertical-align:middle;margin-right:6px;border:1px solid #e2e8f0">
+              {% endif %}
+              {{ t.name }}
+            </td>
             <td class="score">{{ t.score }}</td>
             <td class="solves">{{ scount.get(t.id, 0) }}</td>
           </tr>
