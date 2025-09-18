@@ -145,6 +145,34 @@ def admin_activate():
     return {"ok": True}
 
 @app.post("/admin/add-team")
+@app.post("/admin/teams/add")
+def admin_teams_add():
+    if session.get("admin_ok") != True:
+        return "Niet ingelogd als admin", 401
+
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        return "Teamnaam verplicht", 400
+
+    # zelfde logica als /admin/add-team API
+    import secrets
+    join_code = str(secrets.randbelow(900000) + 100000)
+    ttoken = secrets.token_urlsafe(24)
+
+    try:
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO teams(name, join_code, token) VALUES(?,?,?)",
+                (name, join_code, ttoken)
+            )
+    except Exception as e:
+        # bv. unieke naam bestaat al
+        return f"Kon team niet toevoegen: {e}", 400
+
+    # toon melding op de pagina
+    session["last_join_code"] = {"name": name, "join_code": join_code}
+    return redirect("/admin/teams")
+
 @app.get("/admin/list-teams")
 def admin_list_teams():
     token = request.headers.get("X-Admin-Token", "")
@@ -167,3 +195,60 @@ def admin_add_team():
     with db() as conn:
         conn.execute("INSERT INTO teams(name, join_code, token) VALUES(?,?,?)", (name, join_code, ttoken))
     return {"ok": True, "join_code": join_code}
+
+@app.get("/admin/teams")
+def admin_teams_page():
+    # login check
+    if session.get("admin_ok") != True:
+        return """
+        <form method='post' action='/admin/teams/login' style='max-width:320px;margin:40px auto;font-family:sans-serif'>
+            <h2>Admin login</h2>
+            <input name='token' placeholder='Admin token' style='width:100%;padding:8px;margin:8px 0' />
+            <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:4px'>Inloggen</button>
+        </form>
+        """
+
+    # data ophalen
+    with db() as conn:
+        rows = conn.execute("SELECT name, join_code FROM teams ORDER BY name ASC").fetchall()
+
+    # recente join-code (na toevoegen)
+    last = session.pop("last_join_code", None)
+    last_html = ""
+    if last:
+        last_html = f"""
+        <div style='max-width:520px;margin:16px auto;padding:10px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:6px;font-family:sans-serif'>
+          Nieuw team <strong>{last['name']}</strong> — join-code: <strong>{last['join_code']}</strong>
+        </div>
+        """
+
+    rows_html = "".join(f"<tr><td style='padding:6px 12px'>{r['name']}</td><td style='padding:6px 12px;font-weight:600'>{r['join_code']}</td></tr>" for r in rows)
+
+    return f"""
+    <div style='font-family:sans-serif;max-width:800px;margin:24px auto'>
+      <h2 style='text-align:center;margin:10px 0 16px 0'>Teamcodes</h2>
+      {last_html}
+      <table style='border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e8f0'>
+        <thead style='background:#f1f5f9'>
+          <tr>
+            <th style='text-align:left;padding:8px 12px'>Team</th>
+            <th style='text-align:left;padding:8px 12px'>Join-code</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows_html}
+        </tbody>
+      </table>
+
+      <hr style='margin:24px 0;border:none;border-top:1px solid #e2e8f0' />
+
+      <h3>Nieuw team toevoegen</h3>
+      <form method="post" action="/admin/teams/add" style='display:flex;gap:8px;align-items:center;margin-top:8px'>
+        <input name="name" placeholder="Teamnaam" required
+               style='flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px'>Toevoegen</button>
+      </form>
+
+      <p style='color:#64748b;font-size:12px;margin-top:6px'>Na toevoegen verschijnt de join-code hierboven in een blauwe melding.</p>
+    </div>
+    """
