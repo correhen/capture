@@ -347,6 +347,13 @@ def admin_teams_page():
         <a href="/admin/backup">🗂 Back-up &amp; Restore</a> &nbsp;•&nbsp;
         <a href="/admin/theme">🎨 Thema</a> &nbsp;•&nbsp;
         <a href="/scoreboard/islands" target="_blank">🌴 Eiland-score</a>
+        <form method="post" action="/admin/upload-flags" enctype="multipart/form-data" style="display:inline-block;margin-left:8px">
+  <label style="display:inline-block;padding:8px 12px;background:#0d9488;color:#fff;border-radius:6px;cursor:pointer">
+    📤 Upload flags.csv/json
+    <input type="file" name="file" accept=".csv,.json" style="display:none" onchange="this.form.submit()">
+  </label>
+</form>
+
       </p>
     </div>
     """
