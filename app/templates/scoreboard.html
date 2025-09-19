@@ -46,22 +46,20 @@
       <thead>
         <tr><th>#</th><th>Team</th><th>Score</th><th>Challenges</th></tr>
       </thead>
-      <tbody>
-        {% for t in teams %}
-          <tr>
-            <td>{{ loop.index }}</td>
-      <td class="team" style="color: {{ (t.name | string) and '' }} /* placeholder, wordt live gekleurd */">
-  {% if t.logo %}<img src="{{ t.logo }}" alt="" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;border-radius:3px">{% endif %}
-  {{ t.name }}
-</td>
+     <tbody id="score-body">
+  {% for t in teams %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td class="team" style="color: {{ team_color(t.name) }}">
+      {% if t.logo %}<img src="{{ t.logo }}" alt="" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;border-radius:3px">{% endif %}
+      {{ t.name }}
+    </td>
+    <td class="score">{{ t.score }}</td>
+    <td class="solves">{{ scount.get(t.id, 0) }}</td>
+  </tr>
+  {% endfor %}
+</tbody>
 
-            <td class="score">{{ t.score }}</td>
-            <td class="solves">{{ scount.get(t.id, 0) }}</td>
-          </tr>
-        {% else %}
-          <tr><td colspan="4" style="text-align:center;padding:20px">Nog geen teams</td></tr>
-        {% endfor %}
-      </tbody>
     </table>
   </main>
   <script>
@@ -100,6 +98,24 @@ async function fetchTicker() {
 }
 fetchTicker();
 setInterval(fetchTicker, 15000);
+</script>
+<script>
+async function refreshScoreboard(){
+  try {
+    const r = await fetch("/api/scoreboard", { cache:"no-store" });
+    const data = await r.json();
+    const body = document.getElementById("score-body");
+    if (!body) return;
+    body.innerHTML = data.map(x => `
+      <tr>
+        <td class="team" style="color:${x.color}">${x.team}</td>
+        <td class="score">${x.score}</td>
+        <td class="solves">—</td>
+      </tr>
+    `).join("");
+  } catch(e){}
+}
+setInterval(refreshScoreboard, 30000);
 </script>
 
 </body>
