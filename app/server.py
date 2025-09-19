@@ -204,16 +204,13 @@ def scoreboard_islands():
     return render_template("scoreboard_islands.html", rows=rows, theme=get_theme())
 
 # -------- Health --------
-@app.get("/health")
-@limiter.exempt  # <-- belangrijk: niet limiteren
-def health_get():
+@app.route("/health", methods=["GET", "HEAD"])
+@limiter.exempt  # niet limiteren
+def health():
+    if request.method == "HEAD":
+        return "", 200
     return {"status": "ok", "time": int(time.time())}, 200
 
-# optioneel: sommige health checks doen HEAD ipv GET
-@app.head("/health")
-@limiter.exempt
-def health_head():
-    return ("", 200)
 
 
 # -------- Admin APIs (met header-token) --------
