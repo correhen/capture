@@ -50,12 +50,11 @@
         {% for t in teams %}
           <tr>
             <td>{{ loop.index }}</td>
-            <td>
-              {% if t.logo %}
-                <img src="{{ t.logo }}" alt="logo" style="width:22px;height:22px;object-fit:cover;border-radius:5px;vertical-align:middle;margin-right:6px;border:1px solid #e2e8f0">
-              {% endif %}
-              {{ t.name }}
-            </td>
+      <td class="team" style="color: {{ (t.name | string) and '' }} /* placeholder, wordt live gekleurd */">
+  {% if t.logo %}<img src="{{ t.logo }}" alt="" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;border-radius:3px">{% endif %}
+  {{ t.name }}
+</td>
+
             <td class="score">{{ t.score }}</td>
             <td class="solves">{{ scount.get(t.id, 0) }}</td>
           </tr>
