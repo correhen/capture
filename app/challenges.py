@@ -6,14 +6,14 @@ from typing import Iterable, List, Tuple, Optional, Dict
 
 from flask import (
     Blueprint, abort, send_from_directory, send_file,
-    session, redirect, url_for, render_template
+    session, redirect, url_for, render_template, request
 )
 from database import db  # voor thema-kleuren uit settings
 
 # --------------------------------- #
 # Blueprint
 # --------------------------------- #
-# Let op: jouw template gebruikt "ch" als blueprint-naam
+# Belangrijk: jouw templates gebruiken 'ch' als blueprint-naam
 ch = Blueprint("ch", __name__, url_prefix="")
 
 # Pad naar de challenges-root
@@ -103,7 +103,7 @@ def get_all_challenges() -> List[Dict[str, object]]:
 
 def find_challenge(cid: str) -> Optional[Dict[str, object]]:
     """Zoek challenge op mapnaam (case-insensitief), slug, of PDF-stem."""
-    cid_low = cid.strip().lower()
+    cid_low = (cid or "").strip().lower()
     for chobj in get_all_challenges():
         name_low = chobj["title"].lower()
         if cid_low == name_low or cid_low == chobj["slug"]:
@@ -122,6 +122,21 @@ def find_challenge(cid: str) -> Optional[Dict[str, object]]:
 
     return None
 
+def secure_join(base: Path, rel: str) -> Optional[Path]:
+    """
+    Veilig samenvoegen van base + rel zonder directory traversal.
+    Retourneert None als het buiten base valt.
+    """
+    if rel is None:
+        return None
+    rel = rel.replace("\\", "/").lstrip("/")
+    target = (base / rel).resolve()
+    try:
+        target.relative_to(base.resolve())
+    except Exception:
+        return None
+    return target
+
 def get_theme():
     with db() as conn:
         c1 = conn.execute("SELECT value FROM settings WHERE key='theme_c1'").fetchone()["value"]
@@ -131,129 +146,6 @@ def get_theme():
 # --------------------------------- #
 # Routes
 # --------------------------------- #
-
-@ch.route("/ch/static/<path:subpath>")
-def serve_challenge_asset(subpath: str):
-    """
-    Veilig statische challenge-bestanden serveren (flags geblokkeerd).
-    Gebruik /ch/static/... ipv /challenges/... zodat /challenges vrij is voor de indexpagina.
-    """
-    low = subpath.lower()
-
-    # Blokkeer directe flag-toegang overal
-    if (
-        low.endswith("flag.txt")
-        or low.endswith("flag.sha256")
-        or low.endswith(".flag")
-        or low.startswith("flag.")
-        or "/flag." in low
-        or low.split("/")[-1] in {"flag.txt", "flag.sha256"}
-    ):
-        abort(403)
-
-    # Folders die we nooit willen serveren
-    if any(part in {".git", "__pycache__"} for part in Path(subpath).parts):
-        abort(403)
-
-    if not CHALL_ROOT.exists():
-        abort(404)
-
-    return send_from_directory(CHALL_ROOT, subpath)
-
-@ch.route("/download-bundle/<cid>")
-def challenge_bundle(cid: str):
-    """
-    Download één challenge als ZIP (zonder flags).
-    <cid> kan mapnaam, slug of pdf-stem zijn.
-    Alleen voor ingelogde teams.
-    """
-    if not is_team_logged_in():
-        return redirect(url_for("submit"))
-
-    chobj = find_challenge(cid)
-    if not chobj:
-        abort(404)
-
-    files = list_files_recursive(chobj["path"])
-    files = [(rel, p) for rel, p in files if not _is_sensitive_file(p)]
-
-    if not files:
-        abort(404)
-
-    mem = io.BytesIO()
-    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        rootname = f"{chobj['title']}"
-        for rel, p in files:
-            zf.write(p, arcname=f"{rootname}/{rel}")
-
-    mem.seek(0)
-    fname = f"{slugify(chobj['title'])}.zip"
-    return send_file(mem, as_attachment=True, download_name=fname, mimetype="application/zip")
-
-@ch.route("/download-all")
-def challenges_download_all():
-    """
-    Download ALLE challenges als één ZIP (zonder flags).
-    Alleen voor ingelogde teams.
-    """
-    if not is_team_logged_in():
-        return redirect(url_for("submit"))
-
-    all_items: List[Tuple[str, Path]] = []
-
-    for chobj in get_all_challenges():
-        for rel, p in list_files_recursive(chobj["path"]):
-            if _is_sensitive_file(p):
-                continue
-            all_items.append((f"{chobj['title']}/{rel}", p))
-
-    if not all_items:
-        abort(404)
-
-    mem = io.BytesIO()
-    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(
-            "README.txt",
-            "CTF Challenges export\nFlags: EXCLUDED\n"
-        )
-        for rel, p in all_items:
-            zf.write(p, arcname=rel)
-
-    mem.seek(0)
-    return send_file(mem, as_attachment=True, download_name="alle-challenges.zip", mimetype="application/zip")
-
-@ch.route("/challenge/<cid>")
-def challenge_detail(cid: str):
-    """
-    Eenvoudige detailpagina:
-    - titel
-    - (optioneel) link naar eerste PDF
-    - download-zip knop
-    """
-    if not is_team_logged_in():
-        return redirect(url_for("submit"))
-
-    chobj = find_challenge(cid)
-    if not chobj:
-        abort(404)
-
-    # Probeer 1 PDF te tonen (handig als 'open pdf')
-    pdfs = list(Path(chobj["path"]).glob("*.pdf"))
-    first_pdf_rel = None
-    if pdfs:
-        first_pdf_rel = f"{chobj['path'].relative_to(CHALL_ROOT).as_posix()}/{pdfs[0].name}"
-
-    # Inline HTML (je mag hier natuurlijk ook een eigen template voor maken)
-    return render_template(
-        "challenge_detail.html" if Path(__file__).with_name("templates").exists() else "base.html",
-        # Als je geen template hebt, kun je dit overschrijven; voor nu geven we data mee:
-        challenge={
-            "title": chobj["title"],
-            "slug": chobj["slug"],
-            "first_pdf_rel": first_pdf_rel,
-        },
-        theme=get_theme(),
-    )
 
 @ch.route("/challenges")
 def challenges_index():
@@ -299,3 +191,110 @@ def challenges_index():
         data=data,
         theme=get_theme(),
     )
+
+@ch.route("/challenge/<cid>")
+def challenge_detail(cid: str):
+    """
+    Detailpagina die jouw template challenge_detail.html gebruikt:
+    - context 'c' met { id, title }
+    - context 'files' met lijst items { name, rel }
+    """
+    if not is_team_logged_in():
+        return redirect(url_for("submit"))
+
+    chobj = find_challenge(cid)
+    if not chobj:
+        abort(404)
+
+    # Lijst van bestanden (zonder flags)
+    files = []
+    for rel, p in list_files_recursive(chobj["path"]):
+        if _is_sensitive_file(p):
+            continue
+        files.append({"name": p.name, "rel": rel})
+
+    return render_template(
+        "challenge_detail.html",
+        c={"id": chobj["slug"], "title": chobj["title"]},
+        files=files,
+        theme=get_theme(),
+    )
+
+@ch.route("/challenge/<cid>/file/<path:relpath>")
+def challenge_download(cid: str, relpath: str):
+    """
+    Download een enkel bestand behorend bij een challenge (zonder flags).
+    Past bij url_for('ch.challenge_download', cid=c.id, relpath=f.rel)
+    """
+    if not is_team_logged_in():
+        return redirect(url_for("submit"))
+
+    chobj = find_challenge(cid)
+    if not chobj:
+        abort(404)
+
+    base = Path(chobj["path"])
+    target = secure_join(base, relpath)
+    if not target or not target.is_file():
+        abort(404)
+    if _is_sensitive_file(target) or _is_hidden_or_tech(target):
+        abort(403)
+
+    # Pad relatief t.o.v. CHALL_ROOT voor send_from_directory
+    rel_from_root = target.relative_to(CHALL_ROOT).as_posix()
+    return send_from_directory(CHALL_ROOT, rel_from_root, as_attachment=True)
+
+@ch.route("/download-bundle/<cid>")
+def challenge_bundle(cid: str):
+    """
+    Download één challenge als ZIP (zonder flags).
+    <cid> kan mapnaam, slug of pdf-stem zijn.
+    """
+    if not is_team_logged_in():
+        return redirect(url_for("submit"))
+
+    chobj = find_challenge(cid)
+    if not chobj:
+        abort(404)
+
+    files = [(rel, p) for rel, p in list_files_recursive(chobj["path"]) if not _is_sensitive_file(p)]
+    if not files:
+        abort(404)
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        rootname = f"{chobj['title']}"
+        for rel, p in files:
+            zf.write(p, arcname=f"{rootname}/{rel}")
+
+    mem.seek(0)
+    fname = f"{slugify(chobj['title'])}.zip"
+    return send_file(mem, as_attachment=True, download_name=fname, mimetype="application/zip")
+
+@ch.route("/download-all")
+def challenges_download_all():
+    """
+    Download ALLE challenges als één ZIP (zonder flags).
+    """
+    if not is_team_logged_in():
+        return redirect(url_for("submit"))
+
+    all_items: List[Tuple[str, Path]] = []
+
+    for chobj in get_all_challenges():
+        for rel, p in list_files_recursive(chobj["path"]):
+            if _is_sensitive_file(p):
+                continue
+            all_items.append((f"{chobj['title']}/{rel}", p))
+
+    if not all_items:
+        abort(404)
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("README.txt", "CTF Challenges export\nFlags: EXCLUDED\n")
+        for rel, p in all_items:
+            zf.write(p, arcname=rel)
+
+    mem.seek(0)
+    return send_file(mem, as_attachment=True, download_name="alle-challenges.zip", mimetype="application/zip")
