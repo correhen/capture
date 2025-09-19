@@ -1,169 +1,212 @@
 # app/challenges.py
-from flask import Blueprint, render_template, send_from_directory, send_file, abort, session, redirect, url_for, flash
+from __future__ import annotations
+import io, re, zipfile, unicodedata
 from pathlib import Path
-import unicodedata, re, io, zipfile
+from typing import Iterable, List, Tuple, Optional, Dict
 
-ch_bp = Blueprint("ch", __name__)
+from flask import Blueprint, abort, send_from_directory, send_file, session, redirect, url_for
 
-ROOT = Path(__file__).resolve().parent / "static" / "challenges"
-ALLOWED = {".pdf", ".txt", ".zip", ".pcap", ".pcapng", ".json", ".png", ".jpg", ".jpeg"}
-LEVEL_DIRS = {"1 - Easy": "Easy", "2 - Medium": "Medium", "3 - Hard": "Hard"}
-# Bestanden die nooit getoond/gedownload mogen worden
-EXCLUDE_FILENAMES = {"flag.txt", "flag.sha256"}
+# Blueprint registreren in server.py met:
+#   from challenges import ch_bp
+#   app.register_blueprint(ch_bp)
+ch_bp = Blueprint("challenges", __name__, url_prefix="")
 
-def _is_sensitive_file(path: Path) -> bool:
-    name = path.name.lower()
-    if name in EXCLUDE_FILENAMES: return True
-    if name.startswith("flag."):  # extra zekerheid
-        return True
-    return False
+# Pad naar de challenges-root
+CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
 
-def list_files_recursive(ch_dir: Path):
-    items = []
-    for p in ch_dir.rglob("*"):
-        if p.is_file():
-            if ALLOWED and p.suffix.lower() not in ALLOWED:
-                continue
-            if _is_sensitive_file(p):
-                continue
-            rel = p.relative_to(ch_dir).as_posix()
-            items.append((rel, p))
-    return items
+# Optionele mapping voor je mappenstructuur (maakt niets uit als de mappen anders heten)
+LEVEL_DIRS = [
+    "1 - Easy",
+    "2 - Medium",
+    "3 - Hard",
+]
 
+# ------------- Helpers ------------- #
 
-
-# ====== AUTH: alleen teams die 'ingelogd' zijn ======
 def is_team_logged_in() -> bool:
     return bool(session.get("team_token"))
 
-@ch_bp.before_request
-def require_team_login():
-    # Alles onder deze blueprint vereist login
-    if not is_team_logged_in():
-        flash("Log in met je team om de challenges te bekijken.", "warning")
-        # Pas '/join' aan naar jouw join-pagina/route
-        return redirect(url_for("join"))  # bv. 'join' of 'home' afhankelijk van jouw app
+def slugify(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-")
+    return text.lower()
 
-# ====== helpers ======
-def slugify(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
-    s = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
-    return s or "challenge"
+def _is_sensitive_file(p: Path) -> bool:
+    """Bestanden die NOOIT publiek/download mee mogen."""
+    name = p.name.lower()
+    if name in {"flag.txt", "flag.sha256"}:
+        return True
+    if name.startswith("flag.") or name.endswith(".flag"):
+        return True
+    # Eventuele “verstopte” flags:
+    if "flag" == p.stem.lower():
+        return True
+    return False
 
-def scan_structure():
-    out = {}
-    for level_dir, label in LEVEL_DIRS.items():
-        p = ROOT / level_dir
-        if not p.is_dir():
+def _is_hidden_or_tech(p: Path) -> bool:
+    """Folders die we niet willen serveren."""
+    bad = {".git", "__pycache__", ".ds_store"}
+    return any(part.lower() in bad for part in p.parts)
+
+def list_files_recursive(root: Path) -> List[Tuple[str, Path]]:
+    """Geef alle bestanden terug als (relatief_pad, absolute_path)."""
+    out: List[Tuple[str, Path]] = []
+    if not root.exists():
+        return out
+    for p in root.rglob("*"):
+        if p.is_dir():
             continue
-        level_slug = slugify(label)
-        out[level_slug] = {"label": label, "challenges": []}
-        for d in sorted(p.iterdir()):
-            if d.is_dir():
-                out[level_slug]["challenges"].append({
-                    "id": slugify(d.name),
-                    "title": d.name,
-                    "path": d
-                })
+        if _is_hidden_or_tech(p):
+            continue
+        rel = str(p.relative_to(root)).replace("\\", "/")
+        out.append((rel, p))
     return out
 
-def find_challenge(cid: str):
-    data = scan_structure()
-    for lvl in data.values():
-        for c in lvl["challenges"]:
-            if c["id"] == cid:
-                return c
-    return None
+def _iter_challenge_dirs() -> Iterable[Path]:
+    """Doorloop alle challenge-mappen (één niveau onder elk 'LEVEL_DIRS'-mapje).
+       Valt terug op alle submappen als LEVEL_DIRS niet bestaat."""
+    if CHALL_ROOT.exists():
+        # Eerst proberen met vaste level mappen
+        used = False
+        for level in LEVEL_DIRS:
+            base = CHALL_ROOT / level
+            if base.exists():
+                used = True
+                for d in base.iterdir():
+                    if d.is_dir():
+                        yield d
+        if not used:
+            # Fallback: alle submappen in CHALL_ROOT
+            for d in CHALL_ROOT.iterdir():
+                if d.is_dir():
+                    yield d
 
-def list_files_recursive(ch_path: Path):
-    files = []
-    for p in ch_path.rglob("*"):
-        if p.is_file() and p.suffix.lower() in ALLOWED:
-            files.append((p.relative_to(ch_path).as_posix(), p))
-    files.sort()
-    return files
-
-def list_files_recursive(ch_dir: Path):
-    items = []
-    for p in ch_dir.rglob("*"):
-        if p.is_file():
-            # bestaand ALLOWED-filter, laat die staan
-            if ALLOWED and p.suffix.lower() not in ALLOWED:
-                continue
-            # NIEUW: blokkeer flags
-            if _is_sensitive_file(p):
-                continue
-            rel = p.relative_to(ch_dir).as_posix()
-            items.append((rel, p))
+def get_all_challenges() -> List[Dict[str, object]]:
+    """Return lijst met challenges: {'title': str, 'path': Path, 'slug': str}"""
+    items: List[Dict[str, object]] = []
+    for d in _iter_challenge_dirs():
+        title = d.name
+        items.append({"title": title, "path": d, "slug": slugify(title)})
     return items
 
+def find_challenge(cid: str) -> Optional[Dict[str, object]]:
+    """Zoek challenge op mapnaam (case-insensitief), slug, of PDF-stem."""
+    cid_low = cid.strip().lower()
+    # Probeer directe naam/slug match
+    for ch in get_all_challenges():
+        name_low = ch["title"].lower()
+        if cid_low == name_low or cid_low == ch["slug"]:
+            return ch
 
-# ====== routes ======
-@ch_bp.route("/challenges")
-def challenges_index():
-    data = scan_structure()
-    return render_template("challenges.html", data=data)
+    # Probeer PDF-stem match (bijv. /download-bundle/<pdfnaam>)
+    for ch in get_all_challenges():
+        for p in Path(ch["path"]).glob("*.pdf"):
+            if p.stem.lower() == cid_low:
+                return ch
 
-@ch_bp.route("/challenge/<cid>")
-def challenge_detail(cid):
-    ch = find_challenge(cid)
-    if not ch:
-        abort(404)
-    files = [{"rel": rel, "name": Path(rel).name} for rel, _ in list_files_recursive(ch["path"])]
-    if not files:
-        abort(404)
-    return render_template("challenge_detail.html", c=ch, files=files)
+    # Substring fallback op naam
+    for ch in get_all_challenges():
+        if cid_low in ch["title"].lower():
+            return ch
 
-@ch_bp.route("/download/<cid>/<path:relpath>")
-def challenge_download(cid, relpath):
-    ch = find_challenge(cid)
-    if not ch:
+    return None
+
+
+# ------------- Routes ------------- #
+
+@ch_bp.route("/challenges/<path:subpath>")
+def serve_challenge_asset(subpath: str):
+    """
+    Veilig statische challenge-bestanden serveren, maar ALTIJD flags blokkeren.
+    Voorbeeld: /challenges/1 - Easy/Intro/intro.pdf
+    """
+    low = subpath.lower()
+    # Blokkeer directe flag-toegang overal
+    if (
+        low.endswith("flag.txt")
+        or low.endswith("flag.sha256")
+        or low.endswith(".flag")
+        or low.startswith("flag.")
+        or "/flag." in low
+        or low.split("/")[-1] in {"flag.txt", "flag.sha256"}
+    ):
+        abort(403)
+
+    # Folders die we nooit willen serveren
+    if any(part in {".git", "__pycache__"} for part in Path(subpath).parts):
+        abort(403)
+
+    if not CHALL_ROOT.exists():
         abort(404)
-    base = ch["path"].resolve()
-    file_path = (base / relpath).resolve()
-    if base not in file_path.parents or not file_path.exists() or file_path.suffix.lower() not in ALLOWED:
-        abort(404)
-    return send_from_directory(base, relpath, as_attachment=True)
+
+    return send_from_directory(CHALL_ROOT, subpath)
+
 
 @ch_bp.route("/download-bundle/<cid>")
-def challenge_bundle(cid):
-    ch = find_challenge(cid)
-    if _is_sensitive_file((ch["path"] / relpath).resolve()):
-        abort(403)  # nope
+def challenge_bundle(cid: str):
+    """
+    Download één challenge als ZIP (zonder flags).
+    <cid> kan mapnaam, slug of pdf-stem zijn.
+    Alleen voor ingelogde teams.
+    """
+    if not is_team_logged_in():
+        return redirect(url_for("submit"))
 
+    ch = find_challenge(cid)
     if not ch:
         abort(404)
-    items = list_files_recursive(ch["path"])
-    if not items:
+
+    files = list_files_recursive(ch["path"])
+    files = [(rel, p) for rel, p in files if not _is_sensitive_file(p)]
+
+    if not files:
         abort(404)
+
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for rel, p in items:
-            zf.write(p, arcname=rel)
+        # Zet alle bestanden onder een nette rootmap in de zip
+        rootname = f"{ch['title']}"
+        for rel, p in files:
+            arcname = f"{rootname}/{rel}"
+            zf.write(p, arcname=arcname)
+
     mem.seek(0)
-    return send_file(mem, as_attachment=True, download_name=f"{slugify(ch['title'])}.zip")
+    fname = f"{slugify(ch['title'])}.zip"
+    return send_file(mem, as_attachment=True, download_name=fname, mimetype="application/zip")
+
 
 @ch_bp.route("/download-all")
 def challenges_download_all():
-    # alleen voor ingelogde teams
+    """
+    Download ALLE challenges als één ZIP (zonder flags).
+    Alleen voor ingelogde teams.
+    """
     if not is_team_logged_in():
         return redirect(url_for("submit"))
-    # verzamel alle challenge-mappen
-    all_items = []
-    for ch in list_challenges():   # gebruik jouw bestaande finder; anders loop over ROOT/LEVEL_DIRS
+
+    all_items: List[Tuple[str, Path]] = []
+
+    for ch in get_all_challenges():
         for rel, p in list_files_recursive(ch["path"]):
-            # Voor onderscheid per challenge in de zip, prefix met mapnaam:
+            if _is_sensitive_file(p):
+                continue
             prefixed_rel = f"{ch['title']}/{rel}"
             all_items.append((prefixed_rel, p))
 
     if not all_items:
         abort(404)
 
-    import io, zipfile
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # Info-bestand
+        zf.writestr(
+            "README.txt",
+            "CTF Challenges export\n"
+            "Flags: EXCLUDED\n"
+        )
         for rel, p in all_items:
             zf.write(p, arcname=rel)
-    mem.seek(0)
-    return send_file(mem, as_attachment=True, download_name="alle-challenges.zip")
 
+    mem.seek(0)
+    return send_file(mem, as_attachment=True, download_name="alle-challenges.zip", mimetype="application/zip")
