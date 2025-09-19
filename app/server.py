@@ -203,9 +203,17 @@ def scoreboard_islands():
         """).fetchall()
     return render_template("scoreboard_islands.html", rows=rows, theme=get_theme())
 
+# -------- Health --------
 @app.get("/health")
-def health():
-    return {"status": "ok", "time": int(time.time())}
+@limiter.exempt  # <-- belangrijk: niet limiteren
+def health_get():
+    return {"status": "ok", "time": int(time.time())}, 200
+
+# optioneel: sommige health checks doen HEAD ipv GET
+@app.head("/health")
+@limiter.exempt
+def health_head():
+    return ("", 200)
 
 
 # -------- Admin APIs (met header-token) --------
