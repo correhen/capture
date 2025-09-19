@@ -2,30 +2,40 @@
 {% block title %}Challenges{% endblock %}
 
 {% block content %}
-<header class="hero" style="padding: 40px 0 50px;">
-  <div class="container">
-    <h1>📂 Challenges</h1>
+<header class="hero" style="position:relative;padding:40px 20px;text-align:center;color:white;background:linear-gradient(135deg,var(--c1),var(--c2));">
+  <div style="position:relative;z-index:1;max-width:800px;margin:0 auto;">
+    <h1 style="margin:0;font-size:2rem;">📂 Challenges</h1>
     <p>Overzicht per niveau. Klik door voor downloads &amp; details.</p>
+    <div style="margin-top:12px;">
+      <a class="btn" href="{{ url_for('ch.challenges_download_all') }}">⬇️ Download alle challenges (.zip)</a>
+    </div>
   </div>
+  <div style="position:absolute;inset:0;background:url('/static/hero-caribbean.jpg') center/cover no-repeat;opacity:.25;mix-blend:overlay;"></div>
 </header>
 
-<div style="text-align:right; margin:0 0 10px 0;">
-  <!-- Let op: blueprint is 'ch' -->
-  <a class="btn" href="{{ url_for('ch.challenges_download_all') }}">⬇️ Download alle challenges (.zip)</a>
+<!-- Liveticker -->
+<div class="ticker-wrap" style="overflow:hidden;white-space:nowrap;border-top:1px solid rgba(255,255,255,0.15);border-bottom:1px solid rgba(0,0,0,0.05);background:rgba(0,0,0,0.04)">
+  <div id="live-ticker" class="ticker" style="display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite">⏳ Laden van liveticker…</div>
 </div>
+<style>
+@keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+</style>
 
-<main style="max-width: 960px; margin: 24px auto 60px; padding: 0 20px;">
+<!-- Countdown -->
+<div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;text-align:center;padding:10px 0;"></div>
+
+<main style="max-width:960px;margin:24px auto 60px;padding:0 20px;">
   {% for level_slug, lvl in data.items() %}
-    <section class="card" style="margin: 16px 0;">
-      <h2 style="margin: 0 0 6px 0;">{{ lvl.label }}</h2>
+    <section class="card" style="margin:16px 0;background:#fff;border-radius:12px;box-shadow:0 4px 8px rgba(0,0,0,0.05);overflow:hidden;">
+      <h2 style="margin:0;padding:16px 20px;background:#f1f5f9;color:#475569;font-size:1.2rem;font-weight:600;">{{ lvl.label }}</h2>
       {% if lvl.challenges %}
-        <ul style="list-style: none; padding: 0; margin: 0;">
+        <ul style="list-style:none;padding:0;margin:0;">
           {% for c in lvl.challenges %}
-            <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;padding:10px 0;">
+            <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;padding:12px 20px;">
               <div>
                 <strong>{{ c.title }}</strong>
               </div>
-              <div style="display:flex; gap:8px;">
+              <div style="display:flex;gap:8px;">
                 <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.id) }}">Bekijken</a>
                 <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ zip</a>
               </div>
@@ -33,9 +43,46 @@
           {% endfor %}
         </ul>
       {% else %}
-        <p style="margin: 12px 0;">(Nog geen challenges in deze categorie)</p>
+        <p style="margin:12px 20px;">(Nog geen challenges in deze categorie)</p>
       {% endif %}
     </section>
   {% endfor %}
 </main>
+
+<script>
+// Countdown
+(function(){
+  try {
+    const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
+    const el = document.getElementById("countdown");
+    if (el && !isNaN(end)) {
+      setInterval(() => {
+        const diff = end - Date.now();
+        if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
+        const h = Math.floor(diff / (1000*60*60));
+        const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+        const s = Math.floor((diff % (1000*60)) / 1000);
+        el.textContent = `⏳ Eindigt over ${h}u ${m}m ${s}s`;
+      }, 1000);
+    }
+  } catch(e){}
+})();
+
+// Liveticker
+async function fetchTicker() {
+  try {
+    const r = await fetch("/api/ticker", { cache: "no-store" });
+    const data = await r.json();
+    const el = document.getElementById("live-ticker");
+    if (!el) return;
+    const text = (data.items && data.items.length)
+      ? " 🏁 " + data.items.join("   •   ")
+      : "Nog geen solves… keep hacking! 💪";
+    el.textContent = text;
+    el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
+  } catch(e) {}
+}
+fetchTicker();
+setInterval(fetchTicker, 15000);
+</script>
 {% endblock %}
