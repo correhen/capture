@@ -13,11 +13,24 @@ document.querySelectorAll('.submit-form').forEach(form => {
       msg.className = 'message text-sm text-red-700';
       return;
     }
-    if (data.correct) {
-      msg.textContent = data.message || 'Goed!';
-      msg.className = 'message text-sm text-green-700';
-      setTimeout(() => window.location.reload(), 800);
-    } else {
+if (data.correct) {
+  msg.textContent = data.message || 'Goed!';
+  msg.className = 'message text-sm text-green-700';
+  // Confetti laden en vuren
+  (async () => {
+    try {
+      if (!window.confetti) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
+          s.onload = res; s.onerror = rej; document.head.appendChild(s);
+        });
+      }
+      window.confetti && window.confetti();
+    } catch(e) {}
+  })();
+  setTimeout(() => window.location.reload(), 800);
+} else {
       msg.textContent = data.message || 'Niet correct';
       msg.className = 'message text-sm text-red-700';
     }
