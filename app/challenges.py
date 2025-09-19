@@ -129,7 +129,7 @@ def challenge_download(cid, relpath):
 def challenge_bundle(cid):
     ch = find_challenge(cid)
     if _is_sensitive_file((ch["path"] / relpath).resolve()):
-    abort(403)  # nope
+        abort(403)  # nope
 
     if not ch:
         abort(404)
