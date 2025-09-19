@@ -5,11 +5,12 @@
 <header class="hero" style="padding: 40px 0 50px;">
   <div class="container">
     <h1>📂 Challenges</h1>
-    <p>Overzicht per niveau. Klik door voor downloads & details.</p>
+    <p>Overzicht per niveau. Klik door voor downloads &amp; details.</p>
   </div>
 </header>
 
 <div style="text-align:right; margin:0 0 10px 0;">
+  <!-- Let op: blueprint is 'ch' -->
   <a class="btn" href="{{ url_for('ch.challenges_download_all') }}">⬇️ Download alle challenges (.zip)</a>
 </div>
 
@@ -24,8 +25,9 @@
               <div>
                 <strong>{{ c.title }}</strong>
               </div>
-              <div>
+              <div style="display:flex; gap:8px;">
                 <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.id) }}">Bekijken</a>
+                <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ zip</a>
               </div>
             </li>
           {% endfor %}
