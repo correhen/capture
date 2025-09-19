@@ -1,13 +1,28 @@
 from __future__ import annotations
-import os, time, json, secrets, io, datetime
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort, send_file
+
+import os
+import time
+import json
+import secrets
+import io
+import datetime
+import hashlib
+from collections import defaultdict
+
+from flask import (
+    Flask, render_template, request, redirect, url_for, session,
+    jsonify, abort, send_file, make_response
+)
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
 from database import db
 from models import sha256_hex, DIFFICULTY_POINTS
 from challenges import ch
 
-# -------- Config --------
+# =========================
+# Config
+# =========================
 SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24))
 RATE_LIMIT_SUBMIT = os.getenv("RATE_LIMIT_SUBMIT", "10 per minute")
 RATE_LIMIT_TEAM = os.getenv("RATE_LIMIT_TEAM", "60 per hour")
@@ -15,48 +30,54 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 BASE_DIR = os.path.dirname(__file__)
 CTF_END_ISO = os.getenv("CTF_END_ISO", "2025-09-30T20:00:00Z")
 
-
 app = Flask(__name__)
-app.register_blueprint(ch)
 app.secret_key = SECRET_KEY
+
+# Limiter (globale, vrij royale default)
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
 
-@app.context_processor
-def inject_globals():
-    return {"CTF_END_ISO": CTF_END_ISO}
+# Challenges blueprint
+app.register_blueprint(ch)
 
 
-# -------- DB init/seed + schema upgrades --------
+# =========================
+# DB init / seed / schema upgrades
+# =========================
 def init_db_if_needed():
-    with open(os.path.join(BASE_DIR, "schema.sql"), "r", encoding="utf-8") as f:
+    schema_path = os.path.join(BASE_DIR, "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
         schema_sql = f.read()
+
     with db() as conn:
         conn.executescript(schema_sql)
 
-        # settings table for theme
+        # settings table for theme (bestaat mogelijk al)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS settings(
-          key TEXT PRIMARY KEY,
+          key   TEXT PRIMARY KEY,
           value TEXT NOT NULL
-        )""")
+        )
+        """)
+
         if not conn.execute("SELECT 1 FROM settings WHERE key='theme_c1'").fetchone():
             conn.execute("INSERT INTO settings(key,value) VALUES('theme_c1', '#0d9488')")
         if not conn.execute("SELECT 1 FROM settings WHERE key='theme_c2'").fetchone():
             conn.execute("INSERT INTO settings(key,value) VALUES('theme_c2', '#14b8a6')")
 
         # Schema uitbreidingen (idempotent)
-        try: conn.execute("ALTER TABLE teams ADD COLUMN island TEXT")
-        except Exception: pass
-        try: conn.execute("ALTER TABLE teams ADD COLUMN logo TEXT")
-        except Exception: pass  # niet gebruikt nu, maar kan later handig zijn
-        try: conn.execute("ALTER TABLE challenges ADD COLUMN pdf_url TEXT")
-        except Exception: pass
-        try: conn.execute("ALTER TABLE challenges ADD COLUMN hint TEXT")
-        except Exception: pass
-        try: conn.execute("ALTER TABLE challenges ADD COLUMN hint_revealed INTEGER DEFAULT 0")
-        except Exception: pass
+        for stmt in [
+            "ALTER TABLE teams ADD COLUMN island TEXT",
+            "ALTER TABLE teams ADD COLUMN logo TEXT",
+            "ALTER TABLE challenges ADD COLUMN pdf_url TEXT",
+            "ALTER TABLE challenges ADD COLUMN hint TEXT",
+            "ALTER TABLE challenges ADD COLUMN hint_revealed INTEGER DEFAULT 0",
+        ]:
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass  # al aanwezig: prima
 
-        # Seed alleen als DB leeg is
+        # Seed als leeg
         c = conn.execute("SELECT COUNT(*) AS c FROM teams").fetchone()["c"]
         d = conn.execute("SELECT COUNT(*) AS c FROM challenges").fetchone()["c"]
         if c == 0 and d == 0:
@@ -64,14 +85,18 @@ def init_db_if_needed():
             chal_file = os.path.join(BASE_DIR, "seed_challenges.json")
             teams = json.load(open(team_file, "r", encoding="utf-8")) if os.path.exists(team_file) else []
             chals = json.load(open(chal_file, "r", encoding="utf-8")) if os.path.exists(chal_file) else []
+
             cur = conn.cursor()
             for t in teams:
                 name = t["name"].strip()
                 token = secrets.token_urlsafe(24)
                 join_code = str(secrets.randbelow(900000) + 100000)
                 island = t.get("island")
-                cur.execute("INSERT OR IGNORE INTO teams(name, join_code, token, island) VALUES(?,?,?,?)",
-                            (name, join_code, token, island))
+                cur.execute(
+                    "INSERT OR IGNORE INTO teams(name, join_code, token, island) VALUES(?,?,?,?)",
+                    (name, join_code, token, island)
+                )
+
             for cobj in chals:
                 title = cobj["title"].strip()
                 diff = cobj["difficulty"].strip()
@@ -79,28 +104,36 @@ def init_db_if_needed():
                 if not points:
                     raise ValueError(f"Unknown difficulty: {diff}")
                 flag_hash = sha256_hex(cobj["flag"].strip())
-                active = 1 if cobj.get("active", True) else 0
+                active = 1 if cobj.get("is_active", cobj.get("active", True)) else 0
                 pdf_url = cobj.get("pdf_url")
                 hint = cobj.get("hint")
                 cur.execute(
-                    "INSERT OR IGNORE INTO challenges(title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed) VALUES(?,?,?,?,?,?,?,0)",
+                    """
+                    INSERT OR IGNORE INTO challenges(
+                        title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed
+                    ) VALUES(?,?,?,?,?,?,?,0)
+                    """,
                     (title, diff, flag_hash, points, active, pdf_url, hint)
                 )
 
 init_db_if_needed()
 
-import hashlib
 
+# =========================
+# Helpers
+# =========================
 def team_color(name: str) -> str:
-    """Deterministische, vriendelijkere kleur voor teamnaam."""
+    """Deterministische, vriendelijk ogende HEX-kleur op basis van teamnaam."""
     h = hashlib.md5(name.encode("utf-8")).hexdigest()
-    r = int(h[0:2], 16)//2 + 64
-    g = int(h[2:4], 16)//2 + 64
-    b = int(h[4:6], 16)//2 + 64
+    r = int(h[0:2], 16) // 2 + 64
+    g = int(h[2:4], 16) // 2 + 64
+    b = int(h[4:6], 16) // 2 + 64
     return f"#{r:02x}{g:02x}{b:02x}"
 
+def no_store(resp):
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
 
-# -------- Helpers --------
 def current_team():
     token = session.get("team_token")
     if not token:
@@ -113,21 +146,50 @@ def admin_logged_in() -> bool:
     return session.get("admin_ok") is True
 
 def get_theme():
+    """Lees themakleuren uit de DB (settings)."""
     with db() as conn:
         c1 = conn.execute("SELECT value FROM settings WHERE key='theme_c1'").fetchone()["value"]
         c2 = conn.execute("SELECT value FROM settings WHERE key='theme_c2'").fetchone()["value"]
     return {"c1": c1, "c2": c2}
 
 
-# -------- Public routes --------
+# =========================
+# Jinja context
+# =========================
+@app.context_processor
+def inject_globals():
+    # injecteer de echte theme uit DB; templates gebruiken defaults via |default(...) waar nodig
+    return {
+        "CTF_END_ISO": CTF_END_ISO,
+        "team_color": team_color,
+        "theme": get_theme(),
+    }
+
+
+# =========================
+# Health (Render)
+# =========================
+@app.route("/health", methods=["GET", "HEAD"])
+@limiter.exempt
+def health():
+    if request.method == "HEAD":
+        return "", 200
+    return {"status": "ok", "time": int(time.time())}, 200
+
+
+# =========================
+# Public routes
+# =========================
 @app.get("/")
 def home():
     with db() as conn:
         teams = conn.execute("SELECT name FROM teams ORDER BY name ASC").fetchall()
-    return render_template("home.html",
-                           teams=[t["name"] for t in teams],
-                           error=None,
-                           theme=get_theme())
+    return render_template(
+        "home.html",
+        teams=[t["name"] for t in teams],
+        error=None,
+        theme=get_theme()
+    )
 
 @app.post("/join")
 @limiter.limit("30 per hour")
@@ -137,7 +199,10 @@ def join():
     if not team_name or not join_code:
         return redirect(url_for("home"))
     with db() as conn:
-        row = conn.execute("SELECT token FROM teams WHERE name=? AND join_code=?", (team_name, join_code)).fetchone()
+        row = conn.execute(
+            "SELECT token FROM teams WHERE name=? AND join_code=?",
+            (team_name, join_code)
+        ).fetchone()
         if not row:
             teams = [t["name"] for t in conn.execute("SELECT name FROM teams ORDER BY name").fetchall()]
             return render_template("home.html", teams=teams, error="Onjuiste join code of team.", theme=get_theme()), 401
@@ -157,14 +222,19 @@ def submit():
             WHERE is_active=1
             ORDER BY id ASC
         """).fetchall()
-        solved = {r["challenge_id"] for r in conn.execute(
-            "SELECT challenge_id FROM solves WHERE team_id=?", (team["id"],)
-        ).fetchall()}
-    return render_template("submit.html",
-                           team=team,
-                           challenges=challenges,
-                           solved=solved,
-                           theme=get_theme())
+        solved = {
+            r["challenge_id"]
+            for r in conn.execute(
+                "SELECT challenge_id FROM solves WHERE team_id=?", (team["id"],)
+            ).fetchall()
+        }
+    return render_template(
+        "submit.html",
+        team=team,
+        challenges=challenges,
+        solved=solved,
+        theme=get_theme()
+    )
 
 @app.post("/api/submit")
 @limiter.limit(lambda: RATE_LIMIT_SUBMIT)
@@ -182,36 +252,56 @@ def api_submit():
     flagh = sha256_hex(flag)
     with db() as conn:
         chal = conn.execute(
-            "SELECT id, title, points, flag_hash FROM challenges WHERE id=? AND is_active=1", (challenge_id,)
+            "SELECT id, title, points, flag_hash FROM challenges WHERE id=? AND is_active=1",
+            (challenge_id,)
         ).fetchone()
         if not chal:
             return jsonify({"ok": False, "error": "Challenge niet gevonden of inactief."}), 404
+
         if flagh != chal["flag_hash"]:
             return jsonify({"ok": True, "correct": False, "message": "Helaas, dat is niet de juiste flag."})
+
         existing = conn.execute(
-            "SELECT 1 FROM solves WHERE team_id=? AND challenge_id=?", (team["id"], chal["id"])
+            "SELECT 1 FROM solves WHERE team_id=? AND challenge_id=?",
+            (team["id"], chal["id"])
         ).fetchone()
         if existing:
             return jsonify({"ok": True, "correct": True, "message": "Al opgelost — geen extra punten."})
+
         cur = conn.cursor()
         cur.execute("INSERT INTO solves(team_id, challenge_id) VALUES(?,?)", (team["id"], chal["id"]))
         cur.execute("UPDATE teams SET score = score + ? WHERE id=?", (chal["points"], team["id"]))
+
     return jsonify({"ok": True, "correct": True, "message": "Gefeliciteerd! Flag klopt. Punten toegekend."})
 
+
+# =========================
+# Scoreboards (pages)
+# =========================
 @app.get("/scoreboard")
 @limiter.limit("120 per hour")
 def scoreboard():
     with db() as conn:
-        teams_full = conn.execute("SELECT id, name, score, logo FROM teams ORDER BY score DESC, name ASC").fetchall()
-        solves = conn.execute("SELECT team_id, COUNT(*) c FROM solves GROUP BY team_id").fetchall()
-        scount = {r["team_id"]: r["c"] for r in solves}
+        teams_full = conn.execute("""
+            SELECT id, name, score, logo
+            FROM teams
+            ORDER BY score DESC, name ASC
+        """).fetchall()
+        solves = conn.execute("""
+            SELECT team_id, COUNT(*) AS c
+            FROM solves
+            GROUP BY team_id
+        """).fetchall()
+
+    scount = {r["team_id"]: r["c"] for r in solves if r["team_id"] is not None}
     return render_template("scoreboard.html", teams=teams_full, scount=scount, theme=get_theme())
 
 @app.get("/scoreboard/islands")
 def scoreboard_islands():
     with db() as conn:
         rows = conn.execute("""
-            SELECT COALESCE(t.island, 'Onbekend') AS island, COUNT(DISTINCT s.challenge_id) AS solved_unique
+            SELECT COALESCE(t.island, 'Onbekend') AS island,
+                   COUNT(DISTINCT s.challenge_id) AS solved_unique
             FROM solves s
             JOIN teams t ON t.id = s.team_id
             GROUP BY COALESCE(t.island, 'Onbekend')
@@ -219,13 +309,20 @@ def scoreboard_islands():
         """).fetchall()
     return render_template("scoreboard_islands.html", rows=rows, theme=get_theme())
 
+
+# =========================
+# APIs (ticker + live scoreboard)
+# =========================
 @app.get("/api/ticker")
-@limiter.limit("200 per hour")
+@limiter.limit("60 per minute")   # voldoende ruimte, voorkomt abuse
 def api_ticker():
-    # laatste 10 solves uit afgelopen 24 uur
     with db() as conn:
         rows = conn.execute("""
-            SELECT strftime('%H:%M', s.solved_at) AS t, t.name AS team, c.title AS title, c.points AS points
+            SELECT
+              strftime('%H:%M', s.solved_at) AS t,
+              t.name AS team,
+              c.title AS title,
+              c.points AS points
             FROM solves s
             JOIN teams t ON t.id = s.team_id
             JOIN challenges c ON c.id = s.challenge_id
@@ -233,29 +330,41 @@ def api_ticker():
             ORDER BY s.solved_at DESC
             LIMIT 10
         """).fetchall()
+
     items = [f"{r['t']} — {r['team']} solved “{r['title']}” (+{r['points']})" for r in rows]
-    return jsonify({"items": items}), 200
+    return no_store(jsonify({"items": items}))
 
 @app.get("/api/scoreboard")
-@limiter.limit("200 per hour")
+@limiter.limit("60 per minute")
 def api_scoreboard():
     with db() as conn:
-        teams = conn.execute("SELECT name, score FROM teams ORDER BY score DESC, name ASC").fetchall()
-    data = [{"team": r["name"], "score": r["score"], "color": team_color(r["name"])} for r in teams]
-    return jsonify(data), 200
+        teams = conn.execute("""
+            SELECT id, name, score
+            FROM teams
+            ORDER BY score DESC, name ASC
+        """).fetchall()
+        solves = conn.execute("""
+            SELECT team_id, COUNT(*) AS n
+            FROM solves
+            GROUP BY team_id
+        """).fetchall()
+
+    scount = {r["team_id"]: r["n"] for r in solves if r["team_id"] is not None}
+    data = [
+        {
+            "team": r["name"],
+            "score": r["score"],
+            "color": team_color(r["name"]),
+            "solves": scount.get(r["id"], 0),
+        }
+        for r in teams
+    ]
+    return no_store(jsonify(data))
 
 
-# -------- Health --------
-@app.route("/health", methods=["GET", "HEAD"])
-@limiter.exempt  # niet limiteren
-def health():
-    if request.method == "HEAD":
-        return "", 200
-    return {"status": "ok", "time": int(time.time())}, 200
-
-
-
-# -------- Admin APIs (met header-token) --------
+# =========================
+# Admin APIs (token header)
+# =========================
 @app.post("/admin/activate")
 @limiter.limit("30 per hour")
 def admin_activate():
@@ -295,7 +404,9 @@ def admin_list_teams():
     return {"teams": [dict(r) for r in rows]}
 
 
-# -------- Admin web: login --------
+# =========================
+# Admin web: login
+# =========================
 @app.post("/admin/teams/login")
 def admin_teams_login():
     token = request.form.get("token", "")
@@ -305,7 +416,9 @@ def admin_teams_login():
     return "Fout token", 401
 
 
-# -------- Admin web: TEAMS --------
+# =========================
+# Admin web: TEAMS
+# =========================
 @app.get("/admin/teams")
 def admin_teams_page():
     if not admin_logged_in():
@@ -455,7 +568,9 @@ def admin_teams_island():
     return redirect("/admin/teams")
 
 
-# -------- Admin web: CHALLENGES --------
+# =========================
+# Admin web: CHALLENGES
+# =========================
 @app.get("/admin/challenges")
 def admin_challenges_page():
     if not admin_logged_in():
@@ -519,7 +634,8 @@ def admin_challenges_page():
         """
 
     diff_options = "".join(
-        f"<option value='{k}'>{k} ({v} pt)</option>" for k, v in DIFFICULTY_POINTS.items()
+        f"<option value='{k}'>{k} ({v} pt)</option>"
+        for k, v in DIFFICULTY_POINTS.items()
     )
 
     return f"""
@@ -613,14 +729,19 @@ def admin_challenges_add():
     fhash = sha256_hex(flag)
     with db() as conn:
         conn.execute(
-            "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed) VALUES(?,?,?,?,?,?,?,0)",
+            """
+            INSERT INTO challenges(title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed)
+            VALUES(?,?,?,?,?,?,?,0)
+            """,
             (title, difficulty, fhash, points, is_active, (pdf_url or None), (hint or None))
         )
     session["admin_msg"] = f"Challenge '{title}' toegevoegd."
     return redirect("/admin/challenges")
 
 
-# -------- Admin web: BACKUP / RESTORE --------
+# =========================
+# Admin web: BACKUP / RESTORE
+# =========================
 @app.get("/admin/backup")
 def admin_backup_page():
     if not admin_logged_in():
@@ -671,9 +792,15 @@ def admin_backup_export():
         return "Niet ingelogd als admin", 401
 
     with db() as conn:
-        teams = [dict(r) for r in conn.execute("SELECT id, name, join_code, token, score, island FROM teams ORDER BY id").fetchall()]
-        chals = [dict(r) for r in conn.execute("SELECT id, title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed FROM challenges ORDER BY id").fetchall()]
-        solves = [dict(r) for r in conn.execute("SELECT id, team_id, challenge_id FROM solves ORDER BY id").fetchall()]
+        teams = [dict(r) for r in conn.execute(
+            "SELECT id, name, join_code, token, score, island FROM teams ORDER BY id"
+        ).fetchall()]
+        chals = [dict(r) for r in conn.execute(
+            "SELECT id, title, difficulty, flag_hash, points, is_active, pdf_url, hint, hint_revealed FROM challenges ORDER BY id"
+        ).fetchall()]
+        solves = [dict(r) for r in conn.execute(
+            "SELECT id, team_id, challenge_id FROM solves ORDER BY id"
+        ).fetchall()]
 
     payload = {
         "meta": {"version": 2, "exported_at": datetime.datetime.utcnow().isoformat() + "Z"},
@@ -736,7 +863,9 @@ def admin_backup_import():
     return redirect("/admin/backup")
 
 
-# -------- Admin web: THEME --------
+# =========================
+# Admin web: THEME
+# =========================
 @app.get("/admin/theme")
 def admin_theme_page():
     if not admin_logged_in():
@@ -781,13 +910,23 @@ def admin_theme_save():
     c1 = (request.form.get("c1") or "#0d9488").strip()
     c2 = (request.form.get("c2") or "#14b8a6").strip()
     for c in [c1, c2]:
-        if not (len(c) in (4,7) and c.startswith("#")):
+        if not (len(c) in (4, 7) and c.startswith("#")):
             return "Ongeldige kleur", 400
     with db() as conn:
-        conn.execute("INSERT INTO settings(key,value) VALUES('theme_c1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (c1,))
-        conn.execute("INSERT INTO settings(key,value) VALUES('theme_c2',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (c2,))
+        conn.execute(
+            "INSERT INTO settings(key,value) VALUES('theme_c1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (c1,)
+        )
+        conn.execute(
+            "INSERT INTO settings(key,value) VALUES('theme_c2',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (c2,)
+        )
     return redirect("/admin/theme")
 
+
+# =========================
+# Admin: flags upload & cleanup
+# =========================
 @app.post("/admin/upload-flags")
 def admin_upload_flags():
     if not admin_logged_in():
@@ -798,8 +937,7 @@ def admin_upload_flags():
         session["admin_msg"] = "Geen bestand geüpload."
         return redirect("/admin/challenges")
 
-    import io as _io, csv, json as _json, hashlib
-    from pathlib import Path
+    import io as _io, csv, json as _json
 
     def _sha256_hex(s: str) -> str:
         return hashlib.sha256(s.encode("utf-8")).hexdigest()
@@ -827,6 +965,7 @@ def admin_upload_flags():
         return redirect("/admin/challenges")
 
     # challenge-mappen scannen
+    from pathlib import Path
     CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
     DIFF_MAP = {"1 - Easy": "makkelijk", "2 - Medium": "gemiddeld", "3 - Hard": "moeilijk"}
     POINTS   = {"makkelijk": 1, "gemiddeld": 2, "moeilijk": 3}
