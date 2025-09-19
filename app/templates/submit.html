@@ -37,6 +37,17 @@
 </div>
 
   </header>
+  <!-- Liveticker -->
+<div class="ticker-wrap" style="overflow:hidden;white-space:nowrap;border-top:1px solid rgba(255,255,255,0.15);border-bottom:1px solid rgba(0,0,0,0.05);background:rgba(0,0,0,0.04)">
+  <div id="live-ticker" class="ticker" style="display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite">⏳ Laden van liveticker…</div>
+</div>
+<style>
+@keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+</style>
+
+<!-- Countdown -->
+<div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0;"></div>
+
   <main>
     {% for c in challenges %}
       <div class="card">
@@ -99,5 +110,43 @@
       if (data.correct) { confetti(); setTimeout(()=>location.reload(), 400); }
     }
   </script>
+  <script>
+// Countdown (CTF_END_ISO komt uit server.py via context_processor)
+(function(){
+  try {
+    const end = new Date("{{ CTF_END_ISO }}").getTime();
+    const el = document.getElementById("countdown");
+    if (el && !isNaN(end)) {
+      setInterval(() => {
+        const diff = end - Date.now();
+        if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
+        const h = Math.floor(diff / (1000*60*60));
+        const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+        const s = Math.floor((diff % (1000*60)) / 1000);
+        el.textContent = `⏳ Eindigt over ${h}u ${m}m ${s}s`;
+      }, 1000);
+    }
+  } catch(e){}
+})();
+
+// Liveticker
+async function fetchTicker() {
+  try {
+    const r = await fetch("/api/ticker", { cache: "no-store" });
+    const data = await r.json();
+    const el = document.getElementById("live-ticker");
+    if (!el) return;
+    const text = (data.items && data.items.length)
+      ? " 🏁 " + data.items.join("   •   ")
+      : "Nog geen solves… keep hacking! 💪";
+    el.textContent = text;
+    // reset animatie zodat nieuwe content weer van rechts start
+    el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
+  } catch(e) {}
+}
+fetchTicker();
+setInterval(fetchTicker, 15000);
+</script>
+
 </body>
 </html>
