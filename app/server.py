@@ -13,11 +13,17 @@ RATE_LIMIT_SUBMIT = os.getenv("RATE_LIMIT_SUBMIT", "10 per minute")
 RATE_LIMIT_TEAM = os.getenv("RATE_LIMIT_TEAM", "60 per hour")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 BASE_DIR = os.path.dirname(__file__)
+CTF_END_ISO = os.getenv("CTF_END_ISO", "2025-09-30T20:00:00Z")
+
 
 app = Flask(__name__)
 app.register_blueprint(ch)
 app.secret_key = SECRET_KEY
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per hour"])
+
+@app.context_processor
+def inject_globals():
+    return {"CTF_END_ISO": CTF_END_ISO}
 
 
 # -------- DB init/seed + schema upgrades --------
@@ -82,6 +88,16 @@ def init_db_if_needed():
                 )
 
 init_db_if_needed()
+
+import hashlib
+
+def team_color(name: str) -> str:
+    """Deterministische, vriendelijkere kleur voor teamnaam."""
+    h = hashlib.md5(name.encode("utf-8")).hexdigest()
+    r = int(h[0:2], 16)//2 + 64
+    g = int(h[2:4], 16)//2 + 64
+    b = int(h[4:6], 16)//2 + 64
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 # -------- Helpers --------
@@ -202,6 +218,32 @@ def scoreboard_islands():
             ORDER BY solved_unique DESC, island ASC
         """).fetchall()
     return render_template("scoreboard_islands.html", rows=rows, theme=get_theme())
+
+@app.get("/api/ticker")
+@limiter.limit("200 per hour")
+def api_ticker():
+    # laatste 10 solves uit afgelopen 24 uur
+    with db() as conn:
+        rows = conn.execute("""
+            SELECT strftime('%H:%M', s.solved_at) AS t, t.name AS team, c.title AS title, c.points AS points
+            FROM solves s
+            JOIN teams t ON t.id = s.team_id
+            JOIN challenges c ON c.id = s.challenge_id
+            WHERE s.solved_at >= datetime('now','-1 day')
+            ORDER BY s.solved_at DESC
+            LIMIT 10
+        """).fetchall()
+    items = [f"{r['t']} — {r['team']} solved “{r['title']}” (+{r['points']})" for r in rows]
+    return jsonify({"items": items}), 200
+
+@app.get("/api/scoreboard")
+@limiter.limit("200 per hour")
+def api_scoreboard():
+    with db() as conn:
+        teams = conn.execute("SELECT name, score FROM teams ORDER BY score DESC, name ASC").fetchall()
+    data = [{"team": r["name"], "score": r["score"], "color": team_color(r["name"])} for r in teams]
+    return jsonify(data), 200
+
 
 # -------- Health --------
 @app.route("/health", methods=["GET", "HEAD"])
