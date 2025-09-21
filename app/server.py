@@ -28,7 +28,7 @@ RATE_LIMIT_SUBMIT = os.getenv("RATE_LIMIT_SUBMIT", "10 per minute")
 RATE_LIMIT_TEAM = os.getenv("RATE_LIMIT_TEAM", "60 per hour")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 BASE_DIR = os.path.dirname(__file__)
-CTF_END_ISO = os.getenv("CTF_END_ISO", "2025-09-30T20:00:00Z")
+CTF_END_ISO = os.getenv("CTF_END_ISO", "2025-09-23T15:00:00Z")
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
