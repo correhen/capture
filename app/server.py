@@ -156,14 +156,24 @@ def get_theme():
 # =========================
 # Jinja context
 # =========================
+
+from datetime import datetime, timezone, timedelta
+
+def get_ctf_end_iso() -> str:
+    """Haal CTF eindtijd uit settings; val terug op ENV/constant."""
+    with db() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key='ctf_end_iso'").fetchone()
+    return (row["value"] if row else None) or CTF_END_ISO
+
+
 @app.context_processor
 def inject_globals():
-    # injecteer de echte theme uit DB; templates gebruiken defaults via |default(...) waar nodig
     return {
-        "CTF_END_ISO": CTF_END_ISO,
+        "CTF_END_ISO": get_ctf_end_iso(),  # <-- hier
         "team_color": team_color,
         "theme": get_theme(),
     }
+
 
 
 # =========================
@@ -506,6 +516,7 @@ def admin_teams_page():
         <a href="/admin/challenges">👉 Challenges-beheer</a> &nbsp;•&nbsp;
         <a href="/admin/backup">🗂 Back-up &amp; Restore</a> &nbsp;•&nbsp;
         <a href="/admin/theme">🎨 Thema</a> &nbsp;•&nbsp;
+        <a href="/admin/countdown">⏳ Countdown</a> &nbsp;•&nbsp;
         <a href="/scoreboard/islands" target="_blank">🌴 Eiland-score</a>
       </p>
     </div>
@@ -922,6 +933,87 @@ def admin_theme_save():
             (c2,)
         )
     return redirect("/admin/theme")
+
+@app.get("/admin/countdown")
+def admin_countdown_page():
+    if not admin_logged_in():
+        return redirect("/admin/teams")
+
+    # Huidige waarde (UTC ISO)
+    current_iso = get_ctf_end_iso()
+    # Suggestie: lokale tijd (gebaseerd op default -04:00) om in het formulier te tonen
+    # We tonen alleen de ISO-UTC; de gebruiker voert lokaal in via inputs
+    return f"""
+    <div style='font-family:sans-serif;max-width:640px;margin:24px auto'>
+      <h2>⏳ Countdown instellen</h2>
+      <p>Stel de eindtijd in. Je geeft <strong>lokale tijd</strong> op en kiest je tijdzone; de server slaat dit op als UTC.</p>
+
+      <div style='margin:10px 0 16px;color:#64748b'>
+        Huidige (UTC ISO): <code>{current_iso}</code>
+      </div>
+
+      <form method="post" action="/admin/countdown" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end">
+        <label>Datum<br><input type="date" name="date" required style="padding:8px;border:1px solid #cbd5e1;border-radius:6px"></label>
+        <label>Tijd (lokaal)<br><input type="time" name="time" step="60" required style="padding:8px;border:1px solid #cbd5e1;border-radius:6px"></label>
+        <label>Tijdzone<br>
+          <select name="tz" style="padding:8px;border:1px solid #cbd5e1;border-radius:6px">
+            <option value="-04:00" selected>UTC-04:00 (Caribbean)</option>
+            <option value="-05:00">UTC-05:00</option>
+            <option value="-03:00">UTC-03:00</option>
+            <option value="+00:00">UTC</option>
+            <option value="+01:00">UTC+01:00</option>
+            <option value="+02:00">UTC+02:00</option>
+          </select>
+        </label>
+        <button style="grid-column:1/-1;padding:10px 14px;background:#0d9488;color:#fff;border:none;border-radius:8px">Opslaan</button>
+      </form>
+
+      <p style='margin-top:16px'><a href="/admin/teams">← Terug</a></p>
+    </div>
+    """
+
+def _parse_offset(tz_str: str) -> timedelta:
+    # tz_str zoals "+02:00" of "-04:00"
+    sign = 1 if tz_str.startswith("+") else -1
+    hh, mm = tz_str[1:].split(":")
+    return sign * timedelta(hours=int(hh), minutes=int(mm))
+
+@app.post("/admin/countdown")
+def admin_countdown_save():
+    if not admin_logged_in():
+        return "Niet ingelogd als admin", 401
+
+    date_str = (request.form.get("date") or "").strip()   # YYYY-MM-DD
+    time_str = (request.form.get("time") or "").strip()   # HH:MM of HH:MM:SS
+    tz_str   = (request.form.get("tz") or "-04:00").strip()
+
+    if not date_str or not time_str:
+        return "Datum en tijd verplicht", 400
+
+    # Normaliseer tijd naar HH:MM:SS
+    if len(time_str) == 5:
+        time_str = time_str + ":00"
+
+    try:
+        local_naive = datetime.fromisoformat(f"{date_str}T{time_str}")  # zonder tz
+        offset = _parse_offset(tz_str)
+        # lokale tijd → UTC
+        utc_dt = (local_naive - offset).replace(tzinfo=timezone.utc)
+        iso_utc = utc_dt.isoformat()
+    except Exception as e:
+        return f"Ongeldige invoer: {e}", 400
+
+    with db() as conn:
+        conn.execute("""
+          INSERT INTO settings(key,value) VALUES('ctf_end_iso', ?)
+          ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """, (iso_utc,))
+
+    # kleine bevestiging
+    session["admin_msg"] = f"Countdown ingesteld op {iso_utc} (UTC)."
+    return redirect("/admin/countdown")
+
+
 
 
 # =========================
