@@ -4,79 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto CTF – Caribbean Edition · Challenges</title>
-  <style>
-    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background:#f8fafc; color:#0f172a; line-height:1.5; }
-
-    /* HERO (consistent met home) */
-    header {
-      position:relative; color:white; text-align:center; padding:60px 20px 40px;
-      background:linear-gradient(135deg,var(--c1),var(--c2));
-    }
-    header::before{
-      content:""; position:absolute; inset:0;
-      background:url('/static/hero-caribbean.jpg') center/cover no-repeat;
-      opacity:.25; mix-blend:overlay;
-    }
-    header > * { position: relative; z-index: 1; }
-    h1 { font-size:2.2rem; margin:0 0 .3em; }
-    header p { font-size:1.05rem; opacity:.95; margin:0; }
-
-    /* PAGE */
-    main { max-width:1100px; margin:24px auto 64px; padding:0 20px; }
-    .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin: 0 0 16px; }
-    .search { flex:1 1 260px; display:flex; gap:8px; }
-    .search input {
-      flex:1; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:white;
-      font-size:15px; outline:none;
-    }
-    .search input:focus { border-color:#94a3b8; box-shadow:0 0 0 3px rgba(148,163,184,.15); }
-    .btn {
-      display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid rgba(15,23,42,.15);
-      background:white; text-decoration:none; color:#0f172a; font-weight:600; font-size:14px;
-      transition: transform .06s ease, box-shadow .06s ease;
-    }
-    .btn:hover { transform: translateY(-1px); box-shadow:0 6px 10px rgba(0,0,0,.06); }
-    .btn:active { transform: translateY(0); box-shadow:none; }
-
-    /* TABS */
-    .tabs { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 18px; }
-    .tab {
-      padding:8px 12px; border-radius:999px; border:1px solid #e2e8f0; background:white; cursor:pointer;
-      font-size:14px; font-weight:600;
-    }
-    .tab[aria-selected="true"] { background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; border-color:transparent; }
-
-    /* GRID */
-    .grid { display:grid; grid-template-columns: repeat(1, minmax(0,1fr)); gap:14px; }
-    @media (min-width:640px){ .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-    @media (min-width:1024px){ .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
-    .card {
-      background:white; border-radius:16px; padding:16px; border:1px solid #e2e8f0;
-      box-shadow:0 4px 10px rgba(0,0,0,.04); transition: transform .08s ease, box-shadow .08s ease;
-    }
-    .card:hover { transform: translateY(-2px); box-shadow:0 10px 18px rgba(0,0,0,.07); }
-    .card a { color:inherit; text-decoration:none; display:block; }
-    .chip { display:inline-block; font-size:12px; font-weight:700; letter-spacing:.02em; padding:4px 10px; border-radius:999px; background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe; }
-    .title { font-size:16px; font-weight:800; margin:10px 0 6px; }
-    .meta { font-size:13px; color:#475569; }
-
-    /* FOOTER TICKER */
-    .ticker-wrap { margin-top:24px; overflow:hidden; border-radius:12px; border:1px solid #e2e8f0; background:white; }
-    .ticker { white-space:nowrap; padding:10px 12px; animation: ticker-scroll 35s linear infinite; }
-    @keyframes ticker-scroll {
-      0% { transform: translateX(100%); }
-      100% { transform: translateX(-100%); }
-    }
-  </style>
+  <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <header role="banner">
+  <header class="hero" role="banner">
     <h1>Challenges</h1>
     <p>Zoek, filter en start direct. Succes! 🏝️</p>
   </header>
 
-  <main>
+  <main class="container">
     <div class="toolbar">
       <div class="search">
         <input id="search" type="search" placeholder="Zoek op titel…" aria-label="Zoek challenges" />
@@ -84,7 +20,6 @@
       <a class="btn" href="/download-all" title="Download alle opgaven (zonder flags)">⬇️ Download alle opgaven</a>
     </div>
 
-    <!-- Tabs op basis van `data` keys -->
     <div class="tabs" role="tablist" aria-label="Moeilijkheid">
       {% set first_key = (data|dictsort|first)[0] if data else None %}
       {% for key, group in data|dictsort %}
@@ -95,7 +30,6 @@
       {% endfor %}
     </div>
 
-    <!-- Panels -->
     {% for key, group in data|dictsort %}
       <section class="panel" id="panel-{{ key }}" role="tabpanel" aria-labelledby="tab-{{ key }}" {% if key != first_key %}hidden{% endif %}>
         <div class="grid" data-level="{{ key }}">
@@ -118,7 +52,7 @@
   </main>
 
   <script>
-    // Tabs wisselen
+    // Tabs
     const tabs = [...document.querySelectorAll('.tab')];
     const panels = [...document.querySelectorAll('.panel')];
     tabs.forEach(tab => tab.addEventListener('click', () => {
@@ -130,7 +64,7 @@
       filterCards('');
     }));
 
-    // Zoekfilter
+    // Search
     const search = document.getElementById('search');
     search.addEventListener('input', (e) => filterCards(e.target.value.trim().toLowerCase()));
     function filterCards(query){
@@ -143,7 +77,7 @@
       });
     }
 
-    // Simpele ticker (optioneel: vervang URL door jouw live endpoint)
+    // Ticker
     async function fetchTicker(){
       const el = document.getElementById('ticker');
       try {
@@ -154,11 +88,8 @@
           ? " 🏁 " + data.items.join("   •   ")
           : "Nog geen solves… keep hacking! 💪";
         el.textContent = text;
-        // animatie herstarten
         el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
-      } catch(e) {
-        el.textContent = "Nog geen solves… keep hacking! 💪";
-      }
+      } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
     }
     fetchTicker(); setInterval(fetchTicker, 15000);
   </script>
