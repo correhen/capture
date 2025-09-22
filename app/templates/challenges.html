@@ -1,65 +1,36 @@
 {% extends "base.html" %}
 {% block title %}Challenges{% endblock %}
 
-{% block content %}
-<header class="hero" style="position:relative;color:#fff;text-align:center;padding:60px 20px 40px;background:linear-gradient(135deg,var(--c1),var(--c2));overflow:hidden;">
-  <div style="position:relative;z-index:1;max-width:800px;margin:0 auto;">
-    <h1 style="margin:0;font-size:2rem;">📂 Challenges</h1>
-    <p style="margin-top:6px;opacity:.95">Overzicht per niveau. Klik door voor downloads &amp; details.</p>
-    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+{% block hero %}
+<section class="relative bg-cyan-700 text-white text-center py-16 shadow-lg overflow-hidden">
+  <div class="max-w-5xl mx-auto">
+    <h1 class="text-4xl md:text-5xl font-bold mb-2">📂 Challenges</h1>
+    <p class="text-lg md:text-xl opacity-90">Overzicht per niveau. Klik door voor downloads &amp; details.</p>
+
+    <div class="mt-4 flex flex-wrap justify-center gap-3">
       <a class="btn" href="{{ url_for('ch.challenges_download_all') }}">⬇️ Download alle challenges (.zip)</a>
     </div>
 
-    <!-- Hero rail: countdown + ticker -->
-    <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,.18);border-bottom:1px solid rgba(0,0,0,.08);background:rgba(0,0,0,.08);backdrop-filter:saturate(140%) blur(2px);border-radius:10px;overflow:hidden;">
-      <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;padding:8px 12px;">⏳ Eindigtijd laden…</div>
-      <div id="live-ticker" style="white-space:nowrap;overflow:hidden;padding:8px 12px;border-top:1px solid rgba(255,255,255,.12);animation:ticker-scroll 35s linear infinite">
+    <!-- Rail: countdown + ticker -->
+    <div class="mt-5 rounded-lg border border-white/20 bg-white/10 backdrop-blur-[2px] overflow-hidden">
+      <div id="countdown" class="font-mono py-2 px-3">⏳ Eindigtijd laden…</div>
+      <div id="live-ticker" class="whitespace-nowrap overflow-hidden py-2 px-3 border-t border-white/20">
         ⏳ Laden van liveticker…
       </div>
     </div>
   </div>
-</header>
+</section>
 
 <style>
-/* Zelfde overlay-aanpak als home/submit */
-header.hero::before{
-  content:"";
-  position:absolute; inset:0;
-  background:url('/static/hero-caribbean.jpg') center/cover no-repeat;
-  opacity:.25; mix-blend:overlay;
-}
-/* Ticker animatie */
-@keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+@keyframes ticker-scroll { 0%{ transform: translateX(100%) } 100%{ transform: translateX(-100%) } }
+#live-ticker.scrolling { animation: ticker-scroll 35s linear infinite; }
 </style>
-
-<main style="max-width:960px;margin:24px auto 60px;padding:0 20px;">
-  {% for level_slug, lvl in data.items() %}
-    <section class="card" style="margin:16px 0;background:#fff;border-radius:12px;box-shadow:0 4px 8px rgba(0,0,0,0.05);overflow:hidden;">
-      <h2 style="margin:0;padding:16px 20px;background:#f1f5f9;color:#475569;font-size:1.2rem;font-weight:600;">{{ lvl.label }}</h2>
-      {% if lvl.challenges %}
-        <ul style="list-style:none;padding:0;margin:0;">
-          {% for c in lvl.challenges %}
-            <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;padding:12px 20px;">
-              <div><strong>{{ c.title }}</strong></div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.id) }}">Bekijken</a>
-                <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ zip</a>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p style="margin:12px 20px;">(Nog geen challenges in deze categorie)</p>
-      {% endif %}
-    </section>
-  {% endfor %}
-</main>
 
 <script>
 // === Countdown ===
-// Tip: wil je de eindtijd expliciet in UTC-4 tonen/berekenen, zet CTF_END_ISO op iets als "2025-09-30T20:00:00-04:00".
-// Met "Z" (UTC) rekent de browser correct naar lokale tijd, maar het kan 4 uur schelen als je lokale intentie was UTC-4.
-(function(){
+// Tip: zet CTF_END_ISO server-side op lokale tijd (America/Kralendijk, UTC-4) bv. "2025-09-30T20:00:00-04:00"
+// of laat 'm op UTC met "Z" staan; beide werken, zolang de intentie klopt.
+(() => {
   try {
     const iso = "{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}";
     const end = new Date(iso).getTime();
@@ -90,11 +61,39 @@ async function fetchTicker() {
       ? " 🏁 " + data.items.join("   •   ")
       : "Nog geen solves… keep hacking! 💪";
     el.textContent = text;
-    // herstart animatie
-    el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
+
+    // animatie herstarten
+    el.classList.remove('scrolling');
+    // force reflow
+    void el.offsetWidth;
+    el.classList.add('scrolling');
   } catch(e) {}
 }
 fetchTicker();
 setInterval(fetchTicker, 15000);
 </script>
+{% endblock %}
+
+{% block content %}
+  {% for level_slug, lvl in data.items() %}
+    <section class="bg-white rounded-xl shadow mb-4 overflow-hidden">
+      <h2 class="m-0 px-5 py-3 bg-slate-100 text-slate-600 text-lg font-semibold">{{ lvl.label }}</h2>
+
+      {% if lvl.challenges %}
+        <ul class="list-none p-0 m-0">
+          {% for c in lvl.challenges %}
+            <li class="flex items-center justify-between border-t border-slate-200 px-5 py-3 gap-3">
+              <div class="font-semibold">{{ c.title }}</div>
+              <div class="flex gap-2 flex-wrap">
+                <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.id) }}">Bekijken</a>
+                <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ zip</a>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="px-5 py-3">(Nog geen challenges in deze categorie)</p>
+      {% endif %}
+    </section>
+  {% endfor %}
 {% endblock %}
