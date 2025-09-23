@@ -1,44 +1,65 @@
-{% extends "base.html" %}
-{% block title %}Challenge{% endblock %}
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ challenge.title }} · Crypto CTF</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="hero" role="banner">
+    <h1>{{ challenge.title }}</h1>
+    <p>{{ challenge.level_label }} · {{ challenge.points }} punten</p>
+  </header>
 
-{% block content %}
-<header class="hero" style="padding: 40px 0 50px;">
-  <div class="container">
-    <a href="{{ url_for('ch.challenges_index') }}" style="text-decoration:none;">← Terug naar overzicht</a>
-    <h1 style="margin-top:8px;">{{ c.title }}</h1>
-    <p>Bestanden en downloads voor deze challenge.</p>
-  </div>
-</header>
+  <main class="container">
+    <section class="panel" aria-label="Challenge">
+      <div style="padding:16px; display:grid; gap:16px;">
+        {% if challenge.description %}
+          <div>{{ challenge.description|safe }}</div>
+        {% endif %}
 
-<main style="max-width: 960px; margin: 24px auto 60px; padding: 0 20px;">
-  <section class="card" style="margin: 16px 0;">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div><strong>{{ c.title }}</strong></div>
-      <div>
-        <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ Download alle files (.zip)</a>
+        {% if files %}
+          <div>
+            <h2 style="font-size:1.05rem; margin:0 0 8px;">Bestanden</h2>
+            <ul style="list-style:none; padding:0; margin:0; display:grid; gap:10px;">
+              {% for f in files %}
+                <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; background:#fff;">
+                  <span style="font-weight:700">{{ f.name }}</span>
+                  <a class="btn" href="{{ f.url }}" download>Download</a>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        <div>
+          <a class="btn" href="/submit?challenge={{ challenge.id }}">➡️ Flag indienen</a>
+        </div>
       </div>
+    </section>
+
+    <div class="ticker-wrap" aria-live="polite" aria-atomic="true" style="margin-top:18px">
+      <div class="ticker" id="ticker">Laden van live updates…</div>
     </div>
+  </main>
 
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;">
-
-    {% if files %}
-      <ul style="list-style:none;padding:0;margin:0;">
-        {% for f in files %}
-          <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;padding:10px 0;">
-            <!-- BESTANDSNAAM = KLIKBAAR -->
-            <a href="{{ url_for('ch.challenge_download', cid=c.id, relpath=f.rel) }}"
-               style="text-decoration:none;color:#0d9488;font-weight:500">
-              📄 {{ f.name }}
-            </a>
-
-            <!-- Optioneel: aparte downloadknop behouden -->
-            <a class="btn" href="{{ url_for('ch.challenge_download', cid=c.id, relpath=f.rel) }}">Download</a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>Geen bestanden gevonden voor deze challenge.</p>
-    {% endif %}
-  </section>
-</main>
-{% endblock %}
+  <script>
+    async function fetchTicker(){
+      const el = document.getElementById('ticker');
+      try {
+        const res = await fetch('/api/ticker').catch(()=>null);
+        if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
+        const data = await res.json();
+        const text = (data.items && data.items.length)
+          ? " 🏁 " + data.items.join("   •   ")
+          : "Nog geen solves… keep hacking! 💪";
+        el.textContent = text;
+        el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
+      } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
+    }
+    fetchTicker(); setInterval(fetchTicker, 15000);
+  </script>
+</body>
+</html>
