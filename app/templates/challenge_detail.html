@@ -3,20 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ challenge.title }} · Crypto CTF</title>
+  <title>{{ (challenge.title if challenge and challenge.title) or 'Challenge' }} · Crypto CTF</title>
   <link rel="stylesheet" href="/static/app.css">
   <script defer src="/static/app.js"></script>
 </head>
 <body>
   <header class="hero" role="banner">
-    <h1>{{ challenge.title }}</h1>
-    <p>{{ challenge.level_label }} · {{ challenge.points }} punten</p>
+    <h1>{{ (challenge.title if challenge and challenge.title) or 'Challenge' }}</h1>
+    <p>
+      {{ (challenge.level_label if challenge and challenge.level_label) or '' }}
+      {% if challenge and challenge.points %} · {{ challenge.points }} punten{% endif %}
+    </p>
   </header>
 
   <main class="container">
     <section class="panel" aria-label="Challenge">
       <div style="padding:16px; display:grid; gap:16px;">
-        {% if challenge.description %}
+        {% if challenge and challenge.description %}
           <div>{{ challenge.description|safe }}</div>
         {% endif %}
 
@@ -25,9 +28,15 @@
             <h2 style="font-size:1.05rem; margin:0 0 8px;">Bestanden</h2>
             <ul style="list-style:none; padding:0; margin:0; display:grid; gap:10px;">
               {% for f in files %}
+                {% set fname = (f.name if f and f.name) or (f.filename if f and f.filename) or f|string %}
+                {% set furl  = (f.url if f and f.url) or (f.href if f and f.href) or None %}
                 <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; background:#fff;">
-                  <span style="font-weight:700">{{ f.name }}</span>
-                  <a class="btn" href="{{ f.url }}" download>Download</a>
+                  <span style="font-weight:700">{{ fname }}</span>
+                  {% if furl %}
+                    <a class="btn" href="{{ furl }}" download>Download</a>
+                  {% else %}
+                    <span class="small-note">Geen directe downloadlink</span>
+                  {% endif %}
                 </li>
               {% endfor %}
             </ul>
@@ -35,7 +44,11 @@
         {% endif %}
 
         <div>
-          <a class="btn" href="/submit?challenge={{ challenge.id }}">➡️ Flag indienen</a>
+          {% if challenge and challenge.id %}
+            <a class="btn" href="/submit?challenge={{ challenge.id }}">➡️ Flag indienen</a>
+          {% else %}
+            <a class="btn" href="/submit">➡️ Flag indienen</a>
+          {% endif %}
         </div>
       </div>
     </section>
