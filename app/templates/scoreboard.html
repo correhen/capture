@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto CTF – Caribbean Edition · Scoreboard</title>
   <link rel="stylesheet" href="/static/app.css">
+  <style>.pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 8px; border-radius:999px; font-weight:700; font-size:12px;
+  color:#0f172a; background:#e2e8f0; border:1px solid #cbd5e1;
+}
+.pill .icon{font-size:14px; line-height:1}</style>
+  <script defer src="/static/app.js"></script>
 </head>
 <body>
   <header class="hero" role="banner">
@@ -27,7 +34,7 @@
           {% for i, t in enumerate(teams or []) %}
           <tr>
             <td class="rank">{{ i+1 }}</td>
-            <td class="team">{{ t.team }}</td>
+            <td class="team"><span class="team-badge" data-team="{{ t.team }}">{{ t.team }}</span></td>
             <td class="score">{{ t.score }}</td>
             <td class="solves">{{ t.solves or '—' }}</td>
           </tr>
@@ -52,11 +59,12 @@
         tbody.innerHTML = list.map((x, i) => `
           <tr>
             <td class="rank">${i+1}</td>
-            <td class="team" style="color:${x.color || 'inherit'}">${x.team ?? x.name ?? '—'}</td>
+            <td class="team"><span class="team-badge" data-team="${x.team ?? x.name ?? ''}">${x.team ?? x.name ?? '—'}</span></td>
             <td class="score">${x.score ?? 0}</td>
             <td class="solves">${x.solves ?? '—'}</td>
           </tr>
         `).join("");
+        if (window.decorateTeamBadges) decorateTeamBadges();
       } catch(e){}
     }
     setInterval(refreshScoreboard, 30000);
