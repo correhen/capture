@@ -3,32 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto CTF – Caribbean Edition · Challenges</title>
+  <title>Crypto CTF – Caribbean Edition</title>
   <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+
+  <style>
+    :root{ --c1: {{ theme.c1|default('#037e8d') }}; --c2: {{ theme.c2|default('#f3b118') }}; }
+  </style>
 </head>
 <body>
-  <header class="hero" role="banner">
-    <h1>Challenges</h1>
-    <p>Zoek, filter en start direct. Succes! 🏝️</p>
-  </header>
+  <header class="hero" role="banner"><h1>Challenges</h1><p>Zoek, filter en start direct. Succes! 🏝️</p></header>
 
   <main class="container">
-    <div class="toolbar">
-      <div class="search">
-        <input id="search" type="search" placeholder="Zoek op titel…" aria-label="Zoek challenges" />
-      </div>
-      <a class="btn" href="/download-all" title="Download alle opgaven (zonder flags)">⬇️ Download alle opgaven</a>
-    </div>
+    <div class="toolbar"><div class="search"><input id="search" type="search" placeholder="Zoek op titel…" aria-label="Zoek challenges" /></div><a class="btn" href="/download-all" title="Download alle opgaven (zonder flags)">⬇️ Download alle opgaven</a></div>
 
-    <div class="tabs" role="tablist" aria-label="Moeilijkheid">
-      {% set first_key = (data|dictsort|first)[0] if data else None %}
-      {% for key, group in data|dictsort %}
-        <button class="tab" role="tab"
-          data-tab="{{ key }}" aria-selected="{{ 'true' if key == first_key else 'false' }}">
-          {{ group.label }}
-        </button>
-      {% endfor %}
-    </div>
+    <div class="tabs" role="tablist" aria-label="Moeilijkheid">{% set first_key = (data|dictsort|first)[0] if data else None %}{% for key, group in data|dictsort %}<button class="tab" role="tab" data-tab="{{ key }}" aria-selected="{{ 'true' if key == first_key else 'false' }}">{{ group.label }}</button>{% endfor %}</div>
 
     {% for key, group in data|dictsort %}
       <section class="panel" id="panel-{{ key }}" role="tabpanel" aria-labelledby="tab-{{ key }}" {% if key != first_key %}hidden{% endif %}>
@@ -46,52 +35,10 @@
       </section>
     {% endfor %}
 
-    <div class="ticker-wrap" aria-live="polite" aria-atomic="true">
-      <div class="ticker" id="ticker">Laden van live updates…</div>
-    </div>
+    <div class="ticker-wrap" aria-live="polite" aria-atomic="true"><div class="ticker" id="ticker">Laden van live updates…</div></div>
+
+    <script>const tabs=[...document.querySelectorAll('.tab')];const panels=[...document.querySelectorAll('.panel')];tabs.forEach(tab=>tab.addEventListener('click',()=>{tabs.forEach(t=>t.setAttribute('aria-selected','false'));tab.setAttribute('aria-selected','true');const key=tab.dataset.tab;panels.forEach(p=>p.hidden=!p.id.endsWith(key));document.getElementById('search').value='';filterCards('');}));const search=document.getElementById('search');search.addEventListener('input',e=>filterCards(e.target.value.trim().toLowerCase()));function filterCards(query){const visiblePanel=panels.find(p=>!p.hidden);if(!visiblePanel)return;const cards=visiblePanel.querySelectorAll('.card');cards.forEach(card=>{const title=card.dataset.title||'';card.style.display=(!query||title.includes(query))?'':'none';});}async function fetchTicker(){const el=document.getElementById('ticker');try{const res=await fetch('/api/ticker').catch(()=>null);if(!res||!res.ok){el.textContent='Nog geen solves… keep hacking! 💪';return;}const data=await res.json();const text=(data.items&&data.items.length)?' 🏁 '+data.items.join('   •   '):'Nog geen solves… keep hacking! 💪';el.textContent=text;el.style.animation='none';void el.offsetWidth;el.style.animation='ticker-scroll 35s linear infinite';}catch(e){el.textContent='Nog geen solves… keep hacking! 💪';}}fetchTicker();setInterval(fetchTicker,15000);</script>
   </main>
 
-  <script>
-    // Tabs
-    const tabs = [...document.querySelectorAll('.tab')];
-    const panels = [...document.querySelectorAll('.panel')];
-    tabs.forEach(tab => tab.addEventListener('click', () => {
-      tabs.forEach(t => t.setAttribute('aria-selected', 'false'));
-      tab.setAttribute('aria-selected', 'true');
-      const key = tab.dataset.tab;
-      panels.forEach(p => p.hidden = !p.id.endsWith(key));
-      document.getElementById('search').value = '';
-      filterCards('');
-    }));
-
-    // Search
-    const search = document.getElementById('search');
-    search.addEventListener('input', (e) => filterCards(e.target.value.trim().toLowerCase()));
-    function filterCards(query){
-      const visiblePanel = panels.find(p => !p.hidden);
-      if(!visiblePanel) return;
-      const cards = visiblePanel.querySelectorAll('.card');
-      cards.forEach(card => {
-        const title = card.dataset.title || '';
-        card.style.display = (!query || title.includes(query)) ? '' : 'none';
-      });
-    }
-
-    // Ticker
-    async function fetchTicker(){
-      const el = document.getElementById('ticker');
-      try {
-        const res = await fetch('/api/ticker').catch(() => null);
-        if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
-        const data = await res.json();
-        const text = (data.items && data.items.length)
-          ? " 🏁 " + data.items.join("   •   ")
-          : "Nog geen solves… keep hacking! 💪";
-        el.textContent = text;
-        el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
-      } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
-    }
-    fetchTicker(); setInterval(fetchTicker, 15000);
-  </script>
 </body>
 </html>
