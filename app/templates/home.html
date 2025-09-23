@@ -4,120 +4,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto CTF – Caribbean Edition</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+
   <style>
-    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
-    body { margin:0; font-family: system-ui, sans-serif; background:#f8fafc; color:#0f172a; }
-    header {
-      position:relative; color:white; text-align:center; padding:60px 20px 40px;
-      background:linear-gradient(135deg,var(--c1),var(--c2));
-    }
-    header::before{
-      content:""; position:absolute; inset:0;
-      background:url('/static/hero-caribbean.jpg') center/cover no-repeat;
-      opacity:.25; mix-blend:overlay;
-    }
-    header>*{ position:relative; z-index:1; }
-    h1 { font-size:2.2rem; margin-bottom:.2em; }
-    header p { font-size:1.1rem; opacity:.95; }
-    main { max-width:900px; margin:24px auto 60px; padding:0 20px; }
-    .card { background:white; padding:24px; border-radius:16px; box-shadow:0 4px 8px rgba(0,0,0,0.05); margin-bottom:24px; }
-    h2 { margin-top:0; font-size:1.3rem; border-bottom:1px solid #e2e8f0; padding-bottom:.3em; }
-    form { display:grid; gap:12px; margin-top:12px; }
-    input { padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; }
-    button { background:var(--c1); color:white; padding:12px; border:none; border-radius:8px; font-size:1rem; cursor:pointer; }
-    button:hover { filter:brightness(.95); }
-    .teams { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
-    .team-tag { background:#eef6ff; padding:8px 12px; border-radius:999px; font-weight:600; cursor:pointer; text-decoration:none; }
-    .error { background:#fee2e2; color:#b91c1c; padding:10px; border-radius:8px; margin-bottom:10px; }
-    .sr-only{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;}
-    .ticker-wrap {position:sticky;top:0;z-index:50;overflow:hidden;white-space:nowrap;background:rgba(0,0,0,.04);padding:0 12px;border-bottom:1px solid #e5e7eb}
-    .ticker {display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite}
-    @keyframes ticker-scroll {0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+    :root{ --c1: {{ theme.c1|default('#037e8d') }}; --c2: {{ theme.c2|default('#f3b118') }}; }
   </style>
 </head>
 <body>
-  <header>
+  <header class="hero {% if aruba %}aruba{% endif %}" role="banner">
+    <h1>{% if aruba %}Aruba Edition{% else %}Crypto CTF – Caribbean Edition{% endif %}</h1>
+    <p>{% if aruba %}Bon bini na Aruba! 🎉{% else %}Ontdek, kraak en leer – veel plezier!{% endif %}</p>
+  </header>
 
-    <h1>Crypto CTF – Caribbean Edition</h1>
-    <p>Kraak de code, claim de vlag en versla de andere teams 💥</p>
+  <main class="container">
+    <section class="panel" aria-label="Intro"><div style="padding:16px"><p>Welkom bij de Crypto CTF. Kies een challenge, dien je flag in en klim op het scoreboard.</p>{% if aruba %}<p class="small-note">Deze editie draait 3 dagen op Aruba. Speciale island-ranking staat aan!</p>{% endif %}</div></section>
 
-    </header>
-  
-    <!-- Liveticker -->
-    <div class="ticker-wrap">
-      <div id="live-ticker" class="ticker">⏳ Laden…</div>
-    </div>  
+    <section class="section" aria-label="Teams">
+      <h2 style="font-size:1.1rem; margin:18px 0 10px;">Teams</h2>
+      <div class="teams-cloud">
+        {% for t in teams or [] %}
+          <span class="team-badge" data-team="{{ t if t is string else t.team }}">{{ t if t is string else t.team }}</span>
+        {% endfor %}
+      </div>
+    </section>
 
-  <!-- Countdown -->
-  <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;text-align:center;padding:10px 0;"></div>
-
-  <main>
-    <div class="card">
-      <h2>Meedoen als team</h2>
-      {% if error %}<div class="error">{{ error }}</div>{% endif %}
-      <form method="post" action="/join" onkeydown="if(event.key==='Enter'){this.submit();}">
-        <label for="team_name" class="sr-only">Teamnaam</label>
-        <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required />
-
-        <label for="join_code" class="sr-only">Join-code</label>
-        <input id="join_code" type="text" name="join_code"
-               placeholder="Join-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required />
-
-        <button>🚀 Join</button>
-      </form>
+    <div class="ticker-wrap" aria-live="polite" aria-atomic="true" style="margin-top:18px">
+      <div class="ticker" id="ticker">Laden van live updates…</div>
     </div>
 
-    <div class="card">
-      <h2>Teams die al meedoen</h2>
-      {% if teams %}
-        <div class="teams">
-          {% for t in teams %}
-            <a href="#" class="team-tag" onclick="prefill('{{ t|e }}');return false;">{{ t }}</a>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p>Er zijn nog geen teams aangemaakt.</p>
-      {% endif %}
-    </div>
+    <script>
+      async function fetchTicker(){
+        const el = document.getElementById('ticker');
+        try {
+          const res = await fetch('/api/ticker').catch(()=>null);
+          if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
+          const data = await res.json();
+          const text = (data.items && data.items.length)
+            ? " 🏁 " + data.items.join("   •   ")
+            : "Nog geen solves… keep hacking! 💪";
+          el.textContent = text;
+          el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
+        } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
+      }
+      fetchTicker(); setInterval(fetchTicker, 15000);
+    </script>
   </main>
 
-  <script>
-  // Prefill teamnaam bij klik
-  function prefill(name){
-    const input = document.querySelector('#team_name');
-    if(input){ input.value = name; input.focus(); window.scrollTo({top:0, behavior:'smooth'}); }
-  }
-
-  // Countdown (dagen/uren/minuten)
-  const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
-  const el = document.getElementById("countdown");
-  setInterval(() => {
-    const diff = end - Date.now();
-    if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
-    const days = Math.floor(diff / (1000*60*60*24));
-    const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
-    const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
-    el.textContent = days > 0
-      ? `⏳ Eindigt over ${days}d ${hours}u ${mins}m`
-      : `⏳ Eindigt over ${hours}u ${mins}m`;
-  }, 1000);
-
-  // Liveticker
-  async function fetchTicker() {
-    try {
-      const r = await fetch("/api/ticker", { cache: "no-store" });
-      const data = await r.json();
-      const el = document.getElementById("live-ticker");
-      if (!el) return;
-      const text = (data.items && data.items.length)
-        ? " 🏁 " + data.items.join("   •   ")
-        : "Nog geen solves… keep hacking! 💪";
-      el.textContent = text;
-      el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
-    } catch(e) {}
-  }
-  fetchTicker();
-  setInterval(fetchTicker, 15000);
-  </script>
 </body>
 </html>
