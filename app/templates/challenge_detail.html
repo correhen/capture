@@ -3,76 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ (challenge.title if challenge and challenge.title) or 'Challenge' }} · Crypto CTF</title>
+  <title>Crypto CTF – Caribbean Edition</title>
   <link rel="stylesheet" href="/static/app.css">
   <script defer src="/static/app.js"></script>
+
+  <style>
+    :root{ --c1: {{ theme.c1|default('#037e8d') }}; --c2: {{ theme.c2|default('#f3b118') }}; }
+  </style>
 </head>
 <body>
-  <header class="hero" role="banner">
-    <h1>{{ (challenge.title if challenge and challenge.title) or 'Challenge' }}</h1>
-    <p>
-      {{ (challenge.level_label if challenge and challenge.level_label) or '' }}
-      {% if challenge and challenge.points %} · {{ challenge.points }} punten{% endif %}
-    </p>
-  </header>
+  <header class="hero" role="banner"><h1>{{ (challenge.title if challenge and challenge.title) or 'Challenge' }}</h1><p>{{ (challenge.level_label if challenge and challenge.level_label) or '' }}{% if challenge and challenge.points %} · {{ challenge.points }} punten{% endif %}</p></header>
 
   <main class="container">
-    <section class="panel" aria-label="Challenge">
-      <div style="padding:16px; display:grid; gap:16px;">
-        {% if challenge and challenge.description %}
-          <div>{{ challenge.description|safe }}</div>
-        {% endif %}
+    <section class="panel" aria-label="Challenge"><div style="padding:16px; display:grid; gap:16px;">{% if challenge and challenge.description %}<div>{{ challenge.description|safe }}</div>{% endif %}{% if files %}<div><h2 style="font-size:1.05rem; margin:0 0 8px;">Bestanden</h2><ul style="list-style:none; padding:0; margin:0; display:grid; gap:10px;">{% for f in files %}{% set fname = (f.name if f and f.name) or (f.filename if f and f.filename) or f|string %}{% set furl  = (f.url if f and f.url) or (f.href if f and f.href) or None %}<li style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; background:#fff;"><span style="font-weight:700">{{ fname }}</span>{% if furl %}<a class="btn" href="{{ furl }}" download>Download</a>{% else %}<span class="small-note">Geen directe downloadlink</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}<div>{% if challenge and challenge.id %}<a class="btn" href="/submit?challenge={{ challenge.id }}">➡️ Flag indienen</a>{% else %}<a class="btn" href="/submit">➡️ Flag indienen</a>{% endif %}</div></div></section>
 
-        {% if files %}
-          <div>
-            <h2 style="font-size:1.05rem; margin:0 0 8px;">Bestanden</h2>
-            <ul style="list-style:none; padding:0; margin:0; display:grid; gap:10px;">
-              {% for f in files %}
-                {% set fname = (f.name if f and f.name) or (f.filename if f and f.filename) or f|string %}
-                {% set furl  = (f.url if f and f.url) or (f.href if f and f.href) or None %}
-                <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; background:#fff;">
-                  <span style="font-weight:700">{{ fname }}</span>
-                  {% if furl %}
-                    <a class="btn" href="{{ furl }}" download>Download</a>
-                  {% else %}
-                    <span class="small-note">Geen directe downloadlink</span>
-                  {% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
+    <div class="ticker-wrap" aria-live="polite" aria-atomic="true" style="margin-top:18px"><div class="ticker" id="ticker">Laden van live updates…</div></div>
 
-        <div>
-          {% if challenge and challenge.id %}
-            <a class="btn" href="/submit?challenge={{ challenge.id }}">➡️ Flag indienen</a>
-          {% else %}
-            <a class="btn" href="/submit">➡️ Flag indienen</a>
-          {% endif %}
-        </div>
-      </div>
-    </section>
-
-    <div class="ticker-wrap" aria-live="polite" aria-atomic="true" style="margin-top:18px">
-      <div class="ticker" id="ticker">Laden van live updates…</div>
-    </div>
+    <script>async function fetchTicker(){const el=document.getElementById('ticker');try{const res=await fetch('/api/ticker').catch(()=>null);if(!res||!res.ok){el.textContent='Nog geen solves… keep hacking! 💪';return;}const data=await res.json();const text=(data.items&&data.items.length)?' 🏁 '+data.items.join('   •   '):'Nog geen solves… keep hacking! 💪';el.textContent=text;el.style.animation='none';void el.offsetWidth;el.style.animation='ticker-scroll 35s linear infinite';}catch(e){el.textContent='Nog geen solves… keep hacking! 💪';}}fetchTicker();setInterval(fetchTicker,15000);</script>
   </main>
 
-  <script>
-    async function fetchTicker(){
-      const el = document.getElementById('ticker');
-      try {
-        const res = await fetch('/api/ticker').catch(()=>null);
-        if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
-        const data = await res.json();
-        const text = (data.items && data.items.length)
-          ? " 🏁 " + data.items.join("   •   ")
-          : "Nog geen solves… keep hacking! 💪";
-        el.textContent = text;
-        el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
-      } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
-    }
-    fetchTicker(); setInterval(fetchTicker, 15000);
-  </script>
 </body>
 </html>
