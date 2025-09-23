@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto CTF – Caribbean Edition · Eiland-scoreboard</title>
+  <title>Crypto CTF – Caribbean Edition</title>
   <link rel="stylesheet" href="/static/app.css">
-  <link rel="stylesheet" href="/static/badges_min.css">
   <script defer src="/static/app.js"></script>
+
+  <style>
+    :root{ --c1: {{ theme.c1|default('#037e8d') }}; --c2: {{ theme.c2|default('#f3b118') }}; }
+  </style>
 </head>
 <body>
   <header class="hero" role="banner">
@@ -17,14 +20,7 @@
   <main class="container">
     <section class="panel" aria-label="Eiland-scoreboard">
       <table class="table">
-        <thead>
-          <tr>
-            <th class="rank">#</th>
-            <th>Eiland</th>
-            <th>Teams</th>
-            <th style="text-align:right">Totale score</th>
-          </tr>
-        </thead>
+        <thead><tr><th class="rank">#</th><th>Eiland</th><th>Teams</th><th style="text-align:right">Totale score</th></tr></thead>
         <tbody id="island-scores">
           {% for r in islands or [] %}
           <tr>
@@ -41,43 +37,44 @@
     <div class="ticker-wrap" aria-live="polite" aria-atomic="true">
       <div class="ticker" id="ticker">Laden van live updates…</div>
     </div>
+
+    <script>
+      async function refreshIslands(){
+        const tbody = document.getElementById('island-scores');
+        try {
+          const res = await fetch('/api/scoreboard/islands').catch(()=>null);
+          if(!res || !res.ok) return;
+          const data = await res.json();
+          const list = data.items || data.islands || [];
+          tbody.innerHTML = list.map((x, i) => `
+            <tr>
+              <td class="rank">${i+1}</td>
+              <td class="island">${x.island ?? x.name ?? '—'}</td>
+              <td class="teams">${x.teams ?? 0}</td>
+              <td class="score">${x.score ?? 0}</td>
+            </tr>
+          `).join("");
+        } catch(e){}
+      }
+      setInterval(refreshIslands, 30000);
+      refreshIslands();
+
+      async function fetchTicker(){
+        const el = document.getElementById('ticker');
+        try {
+          const res = await fetch('/api/ticker').catch(()=>null);
+          if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
+          const data = await res.json();
+          const text = (data.items && data.items.length)
+            ? " 🏁 " + data.items.join("   •   ")
+            : "Nog geen solves… keep hacking! 💪";
+          el.textContent = text;
+          el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
+        } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
+      }
+      fetchTicker(); setInterval(fetchTicker, 15000);
+    </script>
   </main>
 
-  <script>
-    async function refreshIslands(){
-      const tbody = document.getElementById('island-scores');
-      try {
-        const res = await fetch('/api/scoreboard/islands').catch(()=>null);
-        if(!res || !res.ok) return;
-        const data = await res.json();
-        const list = data.items || data.islands || [];
-        tbody.innerHTML = list.map((x, i) => `
-          <tr>
-            <td class="rank">${i+1}</td>
-            <td class="island">${x.island ?? x.name ?? '—'}</td>
-            <td class="teams">${x.teams ?? 0}</td>
-            <td class="score">${x.score ?? 0}</td>
-          </tr>
-        `).join("");
-      } catch(e){}
-    }
-    setInterval(refreshIslands, 30000);
-    refreshIslands();
-
-    async function fetchTicker(){
-      const el = document.getElementById('ticker');
-      try {
-        const res = await fetch('/api/ticker').catch(()=>null);
-        if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
-        const data = await res.json();
-        const text = (data.items && data.items.length)
-          ? " 🏁 " + data.items.join("   •   ")
-          : "Nog geen solves… keep hacking! 💪";
-        el.textContent = text;
-        el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
-      } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
-    }
-    fetchTicker(); setInterval(fetchTicker, 15000);
-  </script>
 </body>
 </html>
