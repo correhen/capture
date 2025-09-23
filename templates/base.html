@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Capture The Flag - Caribbean Edition{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+  <style>
+    
+  .btn{
+  background:#0f766e;color:#fff;border:0;border-radius:10px;
+  padding:12px 18px;display:inline-flex;align-items:center;gap:8px;
+  text-decoration:none;transition:transform .05s ease, filter .2s;
+}
+.btn:hover{filter:brightness(1.05);}
+.btn:active{transform:translateY(1px);}
+</style>
+<body class="bg-slate-50 text-slate-800">
+
+  <!-- Navigatiebalk -->
+  <header class="bg-cyan-700 text-white p-4">
+    <div class="max-w-5xl mx-auto flex justify-between items-center">
+      <a href="/" class="font-bold text-lg">Capture The Flag - Caribbean Edition</a>
+      <nav class="space-x-4">
+        <a href="/submit" class="hover:underline">Submit</a>
+        <a href="/scoreboard" class="hover:underline">Scoreboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero / banner -->
+  {% block hero %}
+  <section class="bg-cyan-700 text-white text-center py-16 shadow-lg">
+    <div class="max-w-5xl mx-auto">
+      <h1 class="text-4xl md:text-5xl font-bold mb-2">
+        Crypto CTF – Caribbean Edition
+      </h1>
+      <p class="text-lg md:text-xl opacity-90">
+        Kraak de code, claim de vlag en versla de andere teams ✨
+      </p>
+    </div>
+  </section>
+  {% endblock %}
+
+
+  <!-- Pagina-inhoud -->
+  <main class="max-w-5xl mx-auto p-4 mt-8">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>
+
