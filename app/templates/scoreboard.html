@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto CTF – Caribbean Edition · Scoreboard</title>
   <link rel="stylesheet" href="/static/app.css">
-  <style>.pill{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:4px 8px; border-radius:999px; font-weight:700; font-size:12px;
-  color:#0f172a; background:#e2e8f0; border:1px solid #cbd5e1;
-}
-.pill .icon{font-size:14px; line-height:1}</style>
+  <link rel="stylesheet" href="/static/badges_min.css">
   <script defer src="/static/app.js"></script>
 </head>
 <body>
@@ -31,9 +26,9 @@
           </tr>
         </thead>
         <tbody id="scores">
-          {% for i, t in enumerate(teams or []) %}
+          {% for t in teams or [] %}
           <tr>
-            <td class="rank">{{ i+1 }}</td>
+            <td class="rank">{{ loop.index }}</td>
             <td class="team"><span class="team-badge" data-team="{{ t.team }}">{{ t.team }}</span></td>
             <td class="score">{{ t.score }}</td>
             <td class="solves">{{ t.solves or '—' }}</td>
