@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Challenges – Crypto CTF</title>
+  <style>
+    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
+    body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
+    header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
+    header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
+    header>*{ position:relative; z-index:1; }
+    h1 { margin:0; font-size:2rem; }
+    main { max-width:900px; margin: 24px auto 40px; padding:0 20px; }
+    .card { background:white; border-radius:16px; padding:24px; margin-bottom:20px; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
+    .title { font-size:1.2rem; font-weight:600; margin-bottom:6px; }
+    .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:.8rem; margin-left:6px; }
+    .badge-easy{ background:#dcfce7; color:#166534; }
+    .badge-medium{ background:#fef9c3; color:#92400e; }
+    .badge-hard{ background:#fee2e2; color:#991b1b; }
+    form { display:flex; gap:8px; margin-top:12px; }
+    input { flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:8px; }
+    button { background:var(--c1); color:white; border:none; border-radius:8px; padding:10px 14px; cursor:pointer; }
+    .solved { background:#dcfce7; color:#166534; }
+    .nav { margin-top:10px }
+    .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; }
+    .hint { margin-top:8px; padding:10px; border:1px dashed #a3a3a3; border-radius:8px; background:#fffbea; color:#1f2937 }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:2rem">Challenges</h1>
+    <p>Team: {{ team.name }}</p>
+   <div class="nav">
+  <a href="/challenges">📂 Challenges & downloads</a>
+  <a href="/scoreboard">🏆 Scoreboard</a>
+</div>
+
+  </header>
+  <!-- Liveticker -->
+<div class="ticker-wrap" style="overflow:hidden;white-space:nowrap;border-top:1px solid rgba(255,255,255,0.15);border-bottom:1px solid rgba(0,0,0,0.05);background:rgba(0,0,0,0.04)">
+  <div id="live-ticker" class="ticker" style="display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite">⏳ Laden van liveticker…</div>
+</div>
+<style>
+@keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+</style>
+
+<!-- Countdown -->
+<div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0;"></div>
+
+  <main>
+    {% for c in challenges %}
+      <div class="card">
+        <div class="title">
+          {{ c.title }}
+          <span class="badge {% if c.difficulty=='makkelijk' %}badge-easy{% elif c.difficulty=='gemiddeld' %}badge-medium{% else %}badge-hard{% endif %}">
+            {{ c.difficulty }} – {{ c.points }} pt
+          </span>
+          {% if c.id in solved %}
+            <span class="badge solved">✔️ Opgelost</span>
+          {% endif %}
+        </div>
+
+        {% if c.pdf_url %}
+          <div style="margin-top:8px">
+            <a href="{{ c.pdf_url }}" target="_blank" style="text-decoration:none">📄 Challenge PDF downloaden</a>
+          </div>
+        {% endif %}
+
+        {% if c.hint and c.hint_revealed %}
+          <div class="hint">💡 Tip: {{ c.hint }}</div>
+        {% endif %}
+
+        {% if c.id not in solved %}
+          <form method="post" action="/api/submit" onsubmit="return submitFlag(event, {{ c.id }})">
+            <input type="text" name="flag" placeholder="CTF{...}" required>
+            <button>Submit</button>
+          </form>
+        {% endif %}
+      </div>
+    {% else %}
+      <p>Er zijn nog geen actieve challenges.</p>
+    {% endfor %}
+  </main>
+  <script>
+    function confetti(){
+      for (let i=0;i<120;i++){
+        const d=document.createElement('div');
+        d.style.position='fixed';
+        d.style.left=(Math.random()*100)+'vw';
+        d.style.top='-10px';
+        d.style.width='6px'; d.style.height='10px';
+        d.style.background=['#22c55e','#f59e0b','#06b6d4','#ef4444'][i%4];
+        d.style.opacity='0.9';
+        d.style.transform=`rotate(${Math.random()*360}deg)`;
+        d.style.zIndex=9999;
+        document.body.appendChild(d);
+        const dur = 2000 + Math.random()*1500;
+        d.animate([{transform:d.style.transform, top:'-10px'}, {transform:d.style.transform, top:'110vh'}],
+                  {duration:dur, easing:'ease-in'}).onfinish=()=>d.remove();
+      }
+    }
+    async function submitFlag(e, cid) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      fd.append("challenge_id", cid);
+      const res = await fetch("/api/submit", { method:"POST", body: fd });
+      const data = await res.json();
+      alert(data.message || "Ingediend");
+      if (data.correct) { confetti(); setTimeout(()=>location.reload(), 400); }
+    }
+  </script>
+  <script>
+// Countdown (CTF_END_ISO komt uit server.py via context_processor)
+(function(){
+  try {
+    const end = new Date("{{ CTF_END_ISO }}").getTime();
+    const el = document.getElementById("countdown");
+    if (el && !isNaN(end)) {
+      setInterval(() => {
+        const diff = end - Date.now();
+        if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
+        const h = Math.floor(diff / (1000*60*60));
+        const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+        const s = Math.floor((diff % (1000*60)) / 1000);
+        el.textContent = `⏳ Eindigt over ${h}u ${m}m ${s}s`;
+      }, 1000);
+    }
+  } catch(e){}
+})();
+
+// Liveticker
+async function fetchTicker() {
+  try {
+    const r = await fetch("/api/ticker", { cache: "no-store" });
+    const data = await r.json();
+    const el = document.getElementById("live-ticker");
+    if (!el) return;
+    const text = (data.items && data.items.length)
+      ? " 🏁 " + data.items.join("   •   ")
+      : "Nog geen solves… keep hacking! 💪";
+    el.textContent = text;
+    // reset animatie zodat nieuwe content weer van rechts start
+    el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
+  } catch(e) {}
+}
+fetchTicker();
+setInterval(fetchTicker, 15000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scoreboard – Crypto CTF</title>
+  <style>
+    :root{
+      --c1: {{ theme.c1|default('#037e8d') }};
+      --c2: {{ theme.c2|default('#f3b118') }};
+    }
+    body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
+    header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
+    header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
+    header>*{ position:relative; z-index:1; }
+    h1 { margin:0; font-size:2rem; }
+    main { max-width:900px; margin:24px auto 40px; padding:0 20px; }
+    table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
+    th, td { padding:14px 16px; text-align:left; }
+    th { background:#f1f5f9; color:#475569; font-weight:600; font-size:.9rem; border-bottom:1px solid #e2e8f0;}
+    tr:nth-child(even) td { background:#f9fafb; }
+    .score { font-weight:600; color:#0d9488; }
+    .solves { font-size:.9rem; color:#475569; }
+    .nav { margin-top:10px }
+    .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; margin:0 4px; }
+    .ticker-wrap { overflow:hidden; white-space:nowrap; border-top:1px solid rgba(255,255,255,0.15); border-bottom:1px solid rgba(0,0,0,0.05); background:rgba(0,0,0,0.04) }
+    .ticker { display:inline-block; padding:8px 0; animation:ticker-scroll 35s linear infinite }
+    @keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Scoreboard</h1>
+    <div class="nav">
+      <a href="/submit">🚀 Naar challenges</a>
+      <a href="/scoreboard/islands">🌴 Eiland-ranking</a>
+    </div>
+  </header>
+
+  <!-- Liveticker -->
+  <div class="ticker-wrap">
+    <div id="live-ticker" class="ticker">⏳ Laden van liveticker…</div>
+  </div>
+
+  <!-- Countdown -->
+  <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0;"></div>
+
+  <main>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Team</th><th>Score</th><th>Challenges</th></tr>
+      </thead>
+      <tbody id="score-body">
+        {% for t in teams %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td class="team"
+                style="color:{% if team_color is defined %}{{ team_color(t.name) }}{% else %}#0f172a{% endif %}">
+              {% if t.logo %}
+                <img src="{{ t.logo }}" alt="" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;border-radius:3px">
+              {% endif %}
+              {{ t.name }}
+            </td>
+            <td class="score">{{ t.score }}</td>
+            <td class="solves">{{ (scount[t.id] if scount is defined and t.id in scount else 0) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" style="text-align:center;padding:20px">Nog geen teams</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+
+  <script>
+  // Countdown (CTF_END_ISO komt uit server.py via context_processor)
+  (function(){
+    try {
+      const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
+      const el = document.getElementById("countdown");
+      if (el && !isNaN(end)) {
+        setInterval(() => {
+          const diff = end - Date.now();
+          if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
+          const h = Math.floor(diff / (1000*60*60));
+          const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+          const s = Math.floor((diff % (1000*60)) / 1000);
+          el.textContent = `⏳ Eindigt over ${h}u ${m}m ${s}s`;
+        }, 1000);
+      }
+    } catch(e){}
+  })();
+
+  // Liveticker
+  async function fetchTicker() {
+    try {
+      const r = await fetch("/api/ticker", { cache: "no-store" });
+      const data = await r.json();
+      const el = document.getElementById("live-ticker");
+      if (!el) return;
+      const text = (data.items && data.items.length)
+        ? " 🏁 " + data.items.join("   •   ")
+        : "Nog geen solves… keep hacking! 💪";
+      el.textContent = text;
+      // Reset animatie zodat nieuwe content weer van rechts start
+      el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
+    } catch(e) {}
+  }
+  fetchTicker();
+  setInterval(fetchTicker, 15000);
+  </script>
+
+  <!-- Optioneel: auto-refresh scoreboard (laat de server-render staan als initial state) -->
+  <script>
+  async function refreshScoreboard(){
+    try {
+      const r = await fetch("/api/scoreboard", { cache:"no-store" });
+      const data = await r.json();
+      const body = document.getElementById("score-body");
+      if (!body || !Array.isArray(data)) return;
+      body.innerHTML = data.map((x, i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td class="team" style="color:${x.color}">${x.team}</td>
+          <td class="score">${x.score}</td>
+          <td class="solves">${x.solves ?? '—'}</td>
+        </tr>
+      `).join("");
+    } catch(e){}
+  }
+  // elke 30s verversen; zet uit als je het niet wil
+  setInterval(refreshScoreboard, 30000);
+  </script>
+</body>
+</html>
