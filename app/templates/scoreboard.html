@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto CTF – Caribbean Edition · Scoreboard</title>
+  <title>Crypto CTF – Caribbean Edition</title>
   <link rel="stylesheet" href="/static/app.css">
-  <link rel="stylesheet" href="/static/badges_min.css">
   <script defer src="/static/app.js"></script>
+
+  <style>
+    :root{ --c1: {{ theme.c1|default('#037e8d') }}; --c2: {{ theme.c2|default('#f3b118') }}; }
+  </style>
 </head>
 <body>
   <header class="hero" role="banner">
@@ -17,21 +20,14 @@
   <main class="container">
     <section class="panel" aria-label="Scoreboard">
       <table class="table" aria-describedby="subtitle">
-        <thead>
-          <tr>
-            <th class="rank">#</th>
-            <th>Team</th>
-            <th style="text-align:right">Score</th>
-            <th style="text-align:right">Solves</th>
-          </tr>
-        </thead>
+        <thead><tr><th class="rank">#</th><th>Team</th><th style="text-align:right">Score</th><th style="text-align:right">Solves</th></tr></thead>
         <tbody id="scores">
           {% for t in teams or [] %}
           <tr>
             <td class="rank">{{ loop.index }}</td>
-            <td class="team"><span class="team-badge" data-team="{{ t.team }}">{{ t.team }}</span></td>
-            <td class="score">{{ t.score }}</td>
-            <td class="solves">{{ t.solves or '—' }}</td>
+            <td class="team"><span class="team-badge" data-team="{{ t if t is string else t.team }}">{{ t if t is string else t.team }}</span></td>
+            <td class="score">{{ (t.score if t is mapping else '') }}</td>
+            <td class="solves">{{ (t.solves if t is mapping else '—') }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -41,44 +37,45 @@
     <div class="ticker-wrap" aria-live="polite" aria-atomic="true">
       <div class="ticker" id="ticker">Laden van live updates…</div>
     </div>
+
+    <script>
+      async function refreshScoreboard(){
+        const tbody = document.getElementById('scores');
+        try {
+          const res = await fetch('/api/scoreboard').catch(()=>null);
+          if(!res || !res.ok) return;
+          const data = await res.json();
+          const list = data.items || data.teams || [];
+          tbody.innerHTML = list.map((x, i) => `
+            <tr>
+              <td class="rank">${i+1}</td>
+              <td class="team"><span class="team-badge" data-team="${x.team ?? x.name ?? ''}">${x.team ?? x.name ?? '—'}</span></td>
+              <td class="score">${x.score ?? ''}</td>
+              <td class="solves">${x.solves ?? '—'}</td>
+            </tr>
+          `).join("");
+          if (window.decorateTeamBadges) decorateTeamBadges();
+        } catch(e){}
+      }
+      setInterval(refreshScoreboard, 30000);
+      refreshScoreboard();
+
+      async function fetchTicker(){
+        const el = document.getElementById('ticker');
+        try {
+          const res = await fetch('/api/ticker').catch(()=>null);
+          if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
+          const data = await res.json();
+          const text = (data.items && data.items.length)
+            ? " 🏁 " + data.items.join("   •   ")
+            : "Nog geen solves… keep hacking! 💪";
+          el.textContent = text;
+          el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
+        } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
+      }
+      fetchTicker(); setInterval(fetchTicker, 15000);
+    </script>
   </main>
 
-  <script>
-    async function refreshScoreboard(){
-      const tbody = document.getElementById('scores');
-      try {
-        const res = await fetch('/api/scoreboard').catch(()=>null);
-        if(!res || !res.ok) return;
-        const data = await res.json();
-        const list = data.items || data.teams || [];
-        tbody.innerHTML = list.map((x, i) => `
-          <tr>
-            <td class="rank">${i+1}</td>
-            <td class="team"><span class="team-badge" data-team="${x.team ?? x.name ?? ''}">${x.team ?? x.name ?? '—'}</span></td>
-            <td class="score">${x.score ?? 0}</td>
-            <td class="solves">${x.solves ?? '—'}</td>
-          </tr>
-        `).join("");
-        if (window.decorateTeamBadges) decorateTeamBadges();
-      } catch(e){}
-    }
-    setInterval(refreshScoreboard, 30000);
-    refreshScoreboard();
-
-    async function fetchTicker(){
-      const el = document.getElementById('ticker');
-      try {
-        const res = await fetch('/api/ticker').catch(()=>null);
-        if(!res || !res.ok){ el.textContent = "Nog geen solves… keep hacking! 💪"; return; }
-        const data = await res.json();
-        const text = (data.items && data.items.length)
-          ? " 🏁 " + data.items.join("   •   ")
-          : "Nog geen solves… keep hacking! 💪";
-        el.textContent = text;
-        el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
-      } catch(e) { el.textContent = "Nog geen solves… keep hacking! 💪"; }
-    }
-    fetchTicker(); setInterval(fetchTicker, 15000);
-  </script>
 </body>
 </html>
