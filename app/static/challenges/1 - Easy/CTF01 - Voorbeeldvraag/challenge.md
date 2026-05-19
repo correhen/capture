@@ -1,13 +1,19 @@
 # CTF01 - Voorbeeldvraag
 
-Welkom bij de Crypto CTF.
-
-Deze eerste opdracht is bedoeld om te testen of je weet hoe je een flag moet indienen.
-
 ## Opdracht
 
-Zoek in de opdracht of bijlage naar het voorbeeldantwoord.
+Tijdens een doorzoeking werd een mnemonic phrase van 12 woorden gevonden. Rechercheur Daan probeerde deze phrase in te voeren in Exodus om te controleren of er cryptovaluta aanwezig was. Exodus gaf een foutmelding dat de mnemonic phrase ongeldig is.
 
-## Inleveren
+Vermoedelijk is er een woord verkeerd getypt. Bepaal welk woord dat zou kunnen zijn.
 
-Vul het antwoord in bij "Flag indienen". Je mag `CTF{}` gebruiken, maar dat hoeft niet.
+Mnemonic phrase:
+
+`marine decide draw lobsters carbon mix walk minor mountain skate extra bounce`
+
+## Wat lever je in?
+
+Lever het woord in waarvan je denkt dat het niet klopt.
+
+## Bestanden
+
+- CTF01 - Voorbeeldvraag.pdf

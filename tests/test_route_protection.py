@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -17,9 +18,14 @@ from server import app
 class RouteProtectionTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
+        self.temp_challenge_dirs = []
         with db() as conn:
             team = conn.execute("SELECT token FROM teams ORDER BY id LIMIT 1").fetchone()
         self.team_token = team["token"]
+
+    def tearDown(self):
+        for path in self.temp_challenge_dirs:
+            shutil.rmtree(path, ignore_errors=True)
 
     def login(self):
         with self.client.session_transaction() as sess:
@@ -64,12 +70,22 @@ class RouteProtectionTests(unittest.TestCase):
         body = response.data.decode("utf-8")
         self.assertEqual(response.status_code, 200)
         self.assertIn("<h1>CTF01 - Voorbeeldvraag</h1>", body)
-        self.assertIn("Welkom bij de Crypto CTF.", body)
+        self.assertIn("Tijdens een doorzoeking werd een mnemonic phrase", body)
         self.assertIn('alt="Crypto-Carib"', body)
 
     def test_challenge_detail_shows_fallback_without_markdown(self):
+        challenge_dir = APP_DIR / "static" / "challenges" / "1 - Easy" / "__Test Geen Markdown"
+        challenge_dir.mkdir(parents=True, exist_ok=True)
+        self.temp_challenge_dirs.append(challenge_dir)
+        (challenge_dir / "opdracht.txt").write_text("Testbijlage zonder webtekst.", encoding="utf-8")
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,1)",
+                ("__Test Geen Markdown", "makkelijk", "testhash", 1),
+            )
+
         self.login()
-        response = self.client.get("/challenge/ctf02-exchanges")
+        response = self.client.get("/challenge/test-geen-markdown")
         body = response.data.decode("utf-8")
         self.assertEqual(response.status_code, 200)
         self.assertIn("Voor deze opdracht is nog geen webtekst beschikbaar", body)
