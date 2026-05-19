@@ -19,7 +19,7 @@
     .logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
     .nav-link{padding:8px 10px;border-radius:8px;text-decoration:none;color:#fff;}
     .nav-link:hover{background:rgba(255,255,255,.12);}
-    .brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
+    .brand-logo{width:168px;max-width:42vw;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -27,14 +27,13 @@
   <header class="text-white p-4" style="background:var(--brand-nav-bg)">
     <div class="max-w-5xl mx-auto flex justify-between items-center gap-4 flex-wrap">
       <a href="/" class="font-bold text-lg flex items-center gap-2 no-underline text-white">
-        <img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib">
-        <span>Crypto-Carib</span>
+        <img class="brand-logo" src="{{ url_for('static', filename='img/logo (1).png') }}" alt="Crypto-Carib">
       </a>
       <nav class="flex items-center gap-3 flex-wrap">
         <a href="/" class="nav-link">Home</a>
         <a href="/challenges" class="nav-link">Opdrachten</a>
         <a href="/scoreboard" class="nav-link">Scoreboard</a>
-        <a href="/scoreboard/islands" class="nav-link">Groepsranking</a>
+        <a href="/scoreboard/islands" class="nav-link">Eilandranking</a>
         {% if current_team_status %}
           <span class="team-status team-pill">
             <span>{{ current_team_status.icon }}</span>

@@ -125,11 +125,27 @@ init_db_if_needed()
 # =========================
 def team_color(name: str) -> str:
     """Deterministische, vriendelijk ogende HEX-kleur op basis van teamnaam."""
-    h = hashlib.md5(name.encode("utf-8")).hexdigest()
-    r = int(h[0:2], 16) // 2 + 64
-    g = int(h[2:4], 16) // 2 + 64
-    b = int(h[4:6], 16) // 2 + 64
-    return f"#{r:02x}{g:02x}{b:02x}"
+    if name in TEAM_COLORS:
+        return TEAM_COLORS[name]
+    h = int(hashlib.md5(name.encode("utf-8")).hexdigest()[0:2], 16)
+    return DEFAULT_TEAM_COLORS[h % len(DEFAULT_TEAM_COLORS)]
+
+TEAM_COLORS = {
+    "Asset Avengers": "#0891b2",
+    "Blockchain Busters": "#7c3aed",
+    "Crypto Crusaders": "#ea580c",
+    "Token Titans": "#ca8a04",
+}
+DEFAULT_TEAM_COLORS = [
+    "#0891b2",
+    "#7c3aed",
+    "#ea580c",
+    "#ca8a04",
+    "#2563eb",
+    "#16a34a",
+    "#be123c",
+    "#0f766e",
+]
 
 TEAM_ICONS = {
     "Asset Avengers": "🛡️",
@@ -218,7 +234,7 @@ def _active_challenge_count(conn) -> int:
 def _recent_solve_feed(conn, limit: int = 10):
     rows = conn.execute("""
         SELECT
-          strftime('%H:%M', s.solved_at) AS t,
+          strftime('%H:%M', s.solved_at, '-4 hours') AS t,
           t.name AS team,
           c.title AS title,
           c.points AS points
@@ -437,7 +453,7 @@ def api_submit():
         return jsonify({
             "ok": True,
             "correct": False,
-            "message": "Vul een flag in. CTF{ } mag, maar hoeft niet."
+            "message": "Vul je antwoord in."
         })
 
     with db() as conn:
@@ -452,7 +468,7 @@ def api_submit():
             return jsonify({
                 "ok": True,
                 "correct": False,
-                "message": "Helaas, dat is niet de juiste flag. Controleer of je de juiste opdracht hebt gekozen en of je geen extra spaties hebt. CTF{ } is niet verplicht."
+                "message": "Helaas, dat is niet het juiste antwoord. Controleer je antwoord en probeer opnieuw."
             })
 
         existing = conn.execute(
@@ -514,8 +530,8 @@ def scoreboard_islands():
 def api_ticker():
     with db() as conn:
         rows = conn.execute("""
-            SELECT
-              strftime('%H:%M', s.solved_at) AS t,
+        SELECT
+              strftime('%H:%M', s.solved_at, '-4 hours') AS t,
               t.name AS team,
               c.title AS title,
               c.points AS points

@@ -3,82 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Groepsranking - Crypto CTF</title>
+  <title>Eilandranking - Crypto CTF</title>
   <style>
     :root{
       --c1: {{ theme.c1|default('#037e8d') }};
       --c2: {{ theme.c2|default('#f3b118') }};
-      --brand-primary: {{ theme.c1|default('#037e8d') }};
-      --brand-secondary: {{ theme.c2|default('#f3b118') }};
       --brand-nav-bg: linear-gradient(135deg, {{ theme.c1|default('#037e8d') }}, {{ theme.c2|default('#f3b118') }});
       --brand-nav-active: rgba(255,255,255,.18);
     }
     body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
     .topbar { background:var(--brand-nav-bg); color:white; }
-    .topbar-inner { max-width:900px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .topbar-inner { max-width:900px; margin:0 auto; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
     .brand { font-weight:700; color:white; text-decoration:none; display:flex; align-items:center; gap:10px; }
-    .brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
+    .brand-logo{width:168px;max-width:42vw;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
     .nav-main { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .nav-main a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
     .nav-main a:hover { background:rgba(255,255,255,.12); }
     .nav-main a.active { background:var(--brand-nav-active); box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
     .team-status { color:#dbeafe; font-size:.9rem; }
-    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;}
+    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-left:4px solid var(--team-color,rgba(255,255,255,.6));border-radius:999px;padding:6px 10px;color:#fff;}
     .logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
     header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
     h1 { margin:0; font-size:2rem; }
     .nav { margin-top:10px }
-    .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; margin:0 4px; }
+    .nav a { display:inline-block; padding:8px 12px; background:rgba(255,255,255,.18); color:#fff; border-radius:8px; text-decoration:none; margin:0 4px; border:1px solid rgba(255,255,255,.24); }
     main { max-width:900px; margin:24px auto 40px; padding:0 20px; }
     table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
     th, td { padding:14px 16px; text-align:left; }
     th { background:#f1f5f9; color:#475569; font-weight:600; font-size:.9rem; border-bottom:1px solid #e2e8f0;}
     tr:nth-child(even) td { background:#f9fafb; }
     .score { font-weight:600; color:#0d9488; }
-    .ticker-wrap { overflow:hidden; white-space:nowrap; border-top:1px solid rgba(255,255,255,0.15); border-bottom:1px solid rgba(0,0,0,0.05); background:rgba(0,0,0,0.04) }
+    .ticker-wrap { overflow:hidden; white-space:nowrap; border-bottom:1px solid rgba(0,0,0,0.05); background:rgba(0,0,0,0.04) }
     .ticker { display:inline-block; padding:8px 0; animation:ticker-scroll 35s linear infinite }
     @keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+    @media (max-width:760px){.brand-logo{width:140px;}}
   </style>
 </head>
 <body>
   <div class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/"><img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib"><span>Crypto-Carib</span></a>
+      <a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/logo (1).png') }}" alt="Crypto-Carib"></a>
       <nav class="nav-main" aria-label="Hoofdnavigatie">
-        <a href="/">🏠 Home</a>
-        <a href="/challenges">📜 Opdrachten</a>
-        <a href="/submit">🚩 Submit flag</a>
-        <a href="/scoreboard">🏆 Scoreboard</a>
-        <a class="active" href="/scoreboard/islands">🏝️ Groepsranking</a>
+        <a href="/">Home</a>
+        <a href="/challenges">Opdrachten</a>
+        <a href="/scoreboard">Scoreboard</a>
+        <a class="active" href="/scoreboard/islands">Eilandranking</a>
         {% if current_team_status %}
-          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
+          <span class="team-status team-pill" style="--team-color:{{ current_team_status.color }}"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} &middot; {{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
         {% endif %}
       </nav>
     </div>
   </div>
 
   <header>
-    <h1>Groepsranking</h1>
-    <div class="nav">
-      <a href="/challenges">Naar opdrachten</a>
-      <a href="/scoreboard">Algemeen scoreboard</a>
-    </div>
+    <h1>Eilandranking</h1>
   </header>
 
   <div class="ticker-wrap">
     <div id="live-ticker" class="ticker">Laden van liveticker...</div>
   </div>
 
-  <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0;"></div>
-
   <main>
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>Groep</th>
+          <th>Eiland</th>
           <th>Unieke challenges opgelost</th>
         </tr>
       </thead>
@@ -97,23 +89,6 @@
   </main>
 
   <script>
-  (function(){
-    try {
-      const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
-      const el = document.getElementById("countdown");
-      if (el && !isNaN(end)) {
-        setInterval(() => {
-          const diff = end - Date.now();
-          if (diff <= 0) { el.textContent = "Game over!"; return; }
-          const h = Math.floor(diff / (1000*60*60));
-          const m = Math.floor((diff % (1000*60*60)) / (1000*60));
-          const s = Math.floor((diff % (1000*60)) / 1000);
-          el.textContent = `Eindigt over ${h}u ${m}m ${s}s`;
-        }, 1000);
-      }
-    } catch(e){}
-  })();
-
   async function fetchTicker() {
     try {
       const r = await fetch("/api/ticker", { cache: "no-store" });
@@ -121,8 +96,8 @@
       const el = document.getElementById("live-ticker");
       if (!el) return;
       const text = (data.items && data.items.length)
-        ? " " + data.items.join("   •   ")
-        : "Nog geen solves... succes!";
+        ? " " + data.items.join("   *   ")
+        : "Nog geen solves... de teams zijn aan het puzzelen.";
       el.textContent = text;
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
     } catch(e) {}

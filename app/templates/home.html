@@ -5,67 +5,70 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto CTF - Caribbean Edition</title>
   <style>
-    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; --brand-primary:{{ theme.c1 }}; --brand-secondary:{{ theme.c2 }}; --brand-nav-bg:linear-gradient(135deg, {{ theme.c1 }}, {{ theme.c2 }}); --brand-nav-active:rgba(255,255,255,.18); }
+    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; --brand-nav-bg:linear-gradient(135deg, {{ theme.c1 }}, {{ theme.c2 }}); --brand-nav-active:rgba(255,255,255,.18); }
     body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
     .topbar { background:var(--brand-nav-bg); color:white; }
-    .topbar-inner { max-width:1000px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .topbar-inner { max-width:1040px; margin:0 auto; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
     .brand { font-weight:700; color:white; text-decoration:none; display:flex; align-items:center; gap:10px; }
-    .brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
+    .brand-logo{width:168px;max-width:42vw;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
     .nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .nav a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
     .nav a:hover { background:rgba(255,255,255,.12); }
     .nav a.active { background:var(--brand-nav-active); box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
     .team-status { color:#dbeafe; font-size:.9rem; }
-    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;}
+    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;border-left:4px solid var(--team-color,rgba(255,255,255,.6));}
     .logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
-    header { position:relative; color:white; text-align:center; padding:58px 20px 42px; background:linear-gradient(135deg,var(--c1),var(--c2)); }
+    header { position:relative; color:white; text-align:center; padding:52px 20px 38px; background:linear-gradient(135deg,var(--c1),var(--c2)); }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
     h1 { font-size:2.25rem; margin:.1em 0; }
     header p { font-size:1.1rem; opacity:.95; margin:.4em 0 0; }
-    main { max-width:1000px; margin:24px auto 60px; padding:0 20px; }
-    .grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr); gap:20px; align-items:start; }
+    main { max-width:1040px; margin:24px auto 60px; padding:0 20px; }
     .card { background:white; padding:24px; border-radius:12px; box-shadow:0 4px 8px rgba(0,0,0,0.05); margin-bottom:20px; border:1px solid #e2e8f0; }
-    .start-card { border-top:5px solid var(--c1); }
-    h2 { margin-top:0; font-size:1.3rem; border-bottom:1px solid #e2e8f0; padding-bottom:.35em; }
-    form { display:grid; gap:12px; margin-top:14px; }
-    input { padding:11px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; }
+    h2 { margin-top:0; font-size:1.35rem; border-bottom:1px solid #e2e8f0; padding-bottom:.35em; }
+    input { width:100%; box-sizing:border-box; padding:11px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; }
     button, .btn { background:var(--c1); color:white; padding:11px 14px; border:none; border-radius:8px; font-size:1rem; cursor:pointer; text-decoration:none; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
     button:hover, .btn:hover { filter:brightness(.96); }
     .btn.secondary { background:#334155; }
     .btn.light { background:#e2e8f0; color:#0f172a; }
     .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
-    .teams { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-top:12px; }
-    .team-tag { background:#fff; color:#0f172a; padding:14px; border-radius:10px; font-weight:800; cursor:pointer; text-decoration:none; border:1px solid #e2e8f0; display:flex; align-items:center; gap:10px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
-    .team-tag:hover{border-color:var(--team-color); box-shadow:0 4px 10px rgba(0,0,0,.07);}
-    .team-icon{width:32px;height:32px;border-radius:999px;display:grid;place-items:center;background:color-mix(in srgb, var(--team-color) 18%, white);color:var(--team-color);}
+    .teams { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-top:12px; }
+    .team-card { background:#fff; color:#0f172a; padding:18px; border-radius:12px; border:1px solid #e2e8f0; border-top:5px solid var(--team-color); box-shadow:0 2px 6px rgba(0,0,0,.04); display:grid; gap:12px; }
+    .team-card:focus-within,.team-card:hover{border-color:var(--team-color); box-shadow:0 8px 18px rgba(15,23,42,.08);}
+    .team-head{display:flex;align-items:center;gap:12px;}
+    .team-icon{width:38px;height:38px;border-radius:999px;display:grid;place-items:center;background:color-mix(in srgb, var(--team-color) 18%, white);color:var(--team-color);font-size:1.25rem;}
+    .team-name{font-weight:900;font-size:1.05rem;}
+    .team-help{color:#64748b;font-size:.9rem;margin:0;}
+    .team-form{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;}
     .error { background:#fee2e2; color:#991b1b; padding:11px 12px; border-radius:8px; margin-bottom:12px; border:1px solid #fecaca; }
     .info { background:#ecfeff; color:#155e75; padding:12px; border-radius:8px; border:1px solid #a5f3fc; }
-    .steps { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
-    .steps li { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #e2e8f0; }
-    .steps li:last-child { border-bottom:0; }
+    .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin:0; padding:0; list-style:none; }
+    .steps li { display:flex; gap:10px; align-items:flex-start; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
     .step-n { flex:0 0 auto; width:28px; height:28px; border-radius:999px; background:#ccfbf1; color:#115e59; display:grid; place-items:center; font-weight:800; }
     .progress-wrap{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#475569;font-size:.95rem;}
     .progress-bar{width:190px;height:9px;background:#dbeafe;border-radius:999px;overflow:hidden;}
-    .progress-bar span{display:block;height:100%;background:var(--c1);border-radius:999px;}
+    .progress-bar span{display:block;height:100%;background:var(--team-color,var(--c1));border-radius:999px;}
+    .fallback{margin-top:18px;border-top:1px solid #e2e8f0;padding-top:16px;}
+    .fallback summary{cursor:pointer;color:#475569;font-weight:700;}
+    .fallback form{display:grid;grid-template-columns:1fr 160px auto;gap:8px;margin-top:12px;}
     .sr-only{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;}
     .ticker-wrap {position:sticky;top:0;z-index:50;overflow:hidden;white-space:nowrap;background:rgba(0,0,0,.04);padding:0 12px;border-bottom:1px solid #e5e7eb}
     .ticker {display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite}
     @keyframes ticker-scroll {0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
-    @media (max-width:760px){ .grid{grid-template-columns:1fr;} .topbar-inner{align-items:flex-start;} }
+    @media (max-width:760px){ .topbar-inner{align-items:flex-start;} .team-form,.fallback form{grid-template-columns:1fr;} .brand-logo{width:140px;} }
   </style>
 </head>
 <body>
   <div class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/"><img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib"><span>Crypto-Carib</span></a>
+      <a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/logo (1).png') }}" alt="Crypto-Carib"></a>
       <nav class="nav" aria-label="Hoofdnavigatie">
         <a class="active" href="/">Home</a>
         <a href="/challenges">Opdrachten</a>
         <a href="/scoreboard">Scoreboard</a>
-        <a href="/scoreboard/islands">Groepsranking</a>
+        <a href="/scoreboard/islands">Eilandranking</a>
         {% if current_team_status %}
-          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} &middot; {{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
+          <span class="team-status team-pill" style="--team-color:{{ current_team_status.color }}"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} &middot; {{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
         {% endif %}
       </nav>
     </div>
@@ -80,13 +83,11 @@
     <div id="live-ticker" class="ticker">Laden...</div>
   </div>
 
-  <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;text-align:center;padding:10px 0;"></div>
-
   <main>
     {% if current_team_status %}
       <div class="card info">
         <strong>Je speelt als: {{ current_team_status.name }}</strong>
-        <div class="progress-wrap">
+        <div class="progress-wrap" style="--team-color:{{ current_team_status.color }}">
           <span>{{ current_team_status.solved_count }} van {{ current_team_status.active_challenge_count }} opdrachten opgelost</span>
           <span class="progress-bar" aria-hidden="true"><span style="width:{{ current_team_status.progress_pct }}%"></span></span>
         </div>
@@ -98,71 +99,61 @@
       </div>
     {% endif %}
 
-    <div class="grid">
-      <section class="card start-card">
-        <h2>Kies je team</h2>
-        <p>Kies het team dat je toegewezen hebt gekregen en vul de joincode in. Daarna kun je de opdrachten openen en flags indienen.</p>
-        {% if error %}<div class="error">{{ error }}</div>{% endif %}
-        <form method="post" action="/join" onkeydown="if(event.key==='Enter'){this.submit();}">
-          <label for="team_name" class="sr-only">Teamnaam</label>
-          <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required />
-
-          <label for="join_code" class="sr-only">Join-code</label>
-          <input id="join_code" type="text" name="join_code"
-                 placeholder="Join-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required />
-
-          <button>Start met je team</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Zo werkt het</h2>
-        <ol class="steps">
-          <li><span class="step-n">1</span><span>Kies je toegewezen team en log in met de joincode.</span></li>
-          <li><span class="step-n">2</span><span>Open een opdracht en verdeel het werk binnen je groep.</span></li>
-          <li><span class="step-n">3</span><span>Dien je flag in met of zonder CTF{ }.</span></li>
-          <li><span class="step-n">4</span><span>Scoor punten voor je team en volg de ranking live.</span></li>
-        </ol>
-        <div class="actions">
-          <a class="btn light" href="/scoreboard">Scoreboard</a>
-          <a class="btn light" href="/scoreboard/islands">Groepsranking</a>
-        </div>
-      </section>
-    </div>
-
     <section class="card">
-      <h2>Beschikbare teams</h2>
+      <h2>Kies je team</h2>
+      <p>Klik op je toegewezen team en vul de joincode in.</p>
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
       {% if teams %}
         <div class="teams">
           {% for t in teams %}
-            <a href="#" class="team-tag" style="--team-color:{{ t.color }}" onclick="prefill('{{ t.name|e }}');return false;"><span class="team-icon">{{ t.icon }}</span><span>{{ t.name }}</span></a>
+            <article class="team-card" style="--team-color:{{ t.color }}" onclick="this.querySelector('input[name=join_code]').focus()">
+              <div class="team-head">
+                <span class="team-icon">{{ t.icon }}</span>
+                <div>
+                  <div class="team-name">{{ t.name }}</div>
+                </div>
+              </div>
+              <form class="team-form" method="post" action="/join">
+                <input type="hidden" name="team_name" value="{{ t.name }}">
+                <label class="sr-only" for="join-code-{{ loop.index }}">Joincode voor {{ t.name }}</label>
+                <input id="join-code-{{ loop.index }}" type="text" name="join_code" placeholder="Joincode" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+                <button type="submit">Start</button>
+              </form>
+            </article>
           {% endfor %}
         </div>
       {% else %}
         <p>Er zijn nog geen teams klaargezet.</p>
       {% endif %}
+
+      <details class="fallback">
+        <summary>Team handmatig invullen</summary>
+        <form method="post" action="/join">
+          <label for="team_name" class="sr-only">Teamnaam</label>
+          <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required>
+          <label for="join_code" class="sr-only">Joincode</label>
+          <input id="join_code" type="text" name="join_code" placeholder="Joincode" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+          <button type="submit">Start</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Zo werkt het</h2>
+      <ol class="steps">
+        <li><span class="step-n">1</span><span>Kies je toegewezen team.</span></li>
+        <li><span class="step-n">2</span><span>Open een opdracht en verdeel het werk.</span></li>
+        <li><span class="step-n">3</span><span>Vul je antwoord in.</span></li>
+        <li><span class="step-n">4</span><span>Volg de score live.</span></li>
+      </ol>
+      <div class="actions">
+        <a class="btn light" href="/scoreboard">Scoreboard</a>
+        <a class="btn light" href="/scoreboard/islands">Eilandranking</a>
+      </div>
     </section>
   </main>
 
   <script>
-  function prefill(name){
-    const input = document.querySelector('#team_name');
-    if(input){ input.value = name; input.focus(); window.scrollTo({top:0, behavior:'smooth'}); }
-  }
-
-  const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
-  const el = document.getElementById("countdown");
-  setInterval(() => {
-    const diff = end - Date.now();
-    if (diff <= 0) { el.textContent = "Game over!"; return; }
-    const days = Math.floor(diff / (1000*60*60*24));
-    const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
-    const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
-    el.textContent = days > 0
-      ? `Eindigt over ${days}d ${hours}u ${mins}m`
-      : `Eindigt over ${hours}u ${mins}m`;
-  }, 1000);
-
   async function fetchTicker() {
     try {
       const r = await fetch("/api/ticker", { cache: "no-store" });

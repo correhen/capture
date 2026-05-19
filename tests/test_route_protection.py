@@ -115,7 +115,7 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertIn("<img", body)
 
     def test_logo_is_public(self):
-        response = self.client.get("/static/img/crypto-carib-logo.png")
+        response = self.client.get("/static/img/logo%20(1).png")
         self.assertEqual(response.status_code, 200)
         response.close()
 
@@ -126,7 +126,7 @@ class RouteProtectionTests(unittest.TestCase):
             data={"challenge_id": str(self.ctf01_id), "flag": "verkeerd"},
         )
         self.assertFalse(wrong.get_json()["correct"])
-        self.assertIn("CTF{ } is niet verplicht", wrong.get_json()["message"])
+        self.assertIn("Controleer je antwoord", wrong.get_json()["message"])
 
         correct = self.client.post(
             "/api/submit",
@@ -159,6 +159,8 @@ class RouteProtectionTests(unittest.TestCase):
         body = response.data.decode("utf-8")
         self.assertEqual(response.status_code, 200)
         self.assertIn('aria-label="Podium"', body)
+        self.assertIn("podium-stage", body)
+        self.assertIn("rank-1", body)
         self.assertIn("<table>", body)
         self.assertIn('href="/live"', body)
 
@@ -172,9 +174,32 @@ class RouteProtectionTests(unittest.TestCase):
         body = response.data.decode("utf-8")
         self.assertEqual(response.status_code, 200)
         self.assertIn("Crypto-Carib Live", body)
+        self.assertIn("logo%20(1).png", body)
+        self.assertIn('grid-template-areas:"second first third"', body)
+        self.assertIn("rank-1", body)
         self.assertIn("Podium", body)
         self.assertNotIn(join_code, body)
         self.assertNotIn("CTF{", body)
+
+    def test_visible_ui_uses_eilandranking(self):
+        for path in ["/", "/challenges", "/scoreboard", "/scoreboard/islands", "/submit"]:
+            with self.subTest(path=path):
+                if path == "/submit":
+                    self.login()
+                body = self.client.get(path).data.decode("utf-8")
+                self.assertIn("Eilandranking", body)
+                self.assertNotIn("Groepsranking", body)
+
+    def test_activity_times_render_in_caribbean_time(self):
+        with db() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO solves(team_id, challenge_id, solved_at) VALUES(?,?,?)",
+                (self.team_id, self.ctf01_id, "2026-05-19 20:27:00"),
+            )
+        ticker = self.client.get("/api/ticker").get_json()
+        self.assertTrue(any("16:27" in item for item in ticker["items"]))
+        live_body = self.client.get("/live").data.decode("utf-8")
+        self.assertIn("16:27", live_body)
 
     def test_random_challenge_requires_login(self):
         response = self.client.get("/random-challenge", follow_redirects=False)
@@ -210,8 +235,18 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertIn("PDF beschikbaar", body)
         self.assertIn("Open opdracht", body)
         self.assertIn("Random opdracht", body)
+        self.assertIn("filter-label", body)
         self.assertIn('data-filter="open"', body)
         self.assertIn("Jullie voortgang:", body)
+        self.assertIn("challenge-card", body)
+        self.assertIn('href="/challenge/ctf01-voorbeeldvraag"', body)
+        with db() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO solves(team_id, challenge_id) VALUES(?,?)",
+                (self.team_id, self.ctf01_id),
+            )
+        solved_body = self.client.get("/challenges").data.decode("utf-8")
+        self.assertIn("✓ Opgelost", solved_body)
 
     def test_detail_success_feedback_and_random_action_render(self):
         self.login()
@@ -225,7 +260,11 @@ class RouteProtectionTests(unittest.TestCase):
         response = self.client.get("/")
         body = response.data.decode("utf-8")
         self.assertEqual(response.status_code, 200)
+        self.assertIn("Kies je team", body)
         self.assertIn("team-icon", body)
+        self.assertIn("team-card", body)
+        self.assertIn("input[name=join_code]", body)
+        self.assertIn('name="join_code"', body)
         self.assertIn("--team-color:", body)
 
 

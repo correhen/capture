@@ -122,11 +122,11 @@
         {% if c.solved %}
           <div class="message success" style="display:block">✅ Opgelost door jouw team. Je kunt de opdracht nog bekijken.</div>
         {% else %}
-          <p class="text-slate-600">Vul je antwoord in. CTF{} mag, maar hoeft niet.</p>
+          <p class="text-slate-600">Vul je antwoord in.</p>
           <form id="detail-submit-form" method="post" action="/api/submit">
             <input type="hidden" name="challenge_id" value="{{ c.db_id }}">
             <label for="detail-flag" class="font-bold">Antwoord</label>
-            <input id="detail-flag" class="submit-input" type="text" name="flag" placeholder="CTF{...} of alleen het antwoord" autocomplete="off" required>
+            <input id="detail-flag" class="submit-input" type="text" name="flag" placeholder="Antwoord" autocomplete="off" required>
             <div class="submit-help">Extra spaties aan het begin of eind worden genegeerd.</div>
             <div class="actions"><button class="btn" type="submit">Flag indienen</button></div>
           </form>

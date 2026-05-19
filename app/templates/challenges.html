@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Opdrachten - Crypto CTF</title>
   <style>
-    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; --brand-primary:{{ theme.c1 }}; --brand-secondary:{{ theme.c2 }}; --brand-nav-bg:linear-gradient(135deg, {{ theme.c1 }}, {{ theme.c2 }}); --brand-nav-active:rgba(255,255,255,.18); }
+    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; --brand-nav-bg:linear-gradient(135deg, {{ theme.c1 }}, {{ theme.c2 }}); --brand-nav-active:rgba(255,255,255,.18); }
     body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; line-height:1.5; }
     .topbar { background:var(--brand-nav-bg); color:white; }
-    .topbar-inner { max-width:1100px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .topbar-inner { max-width:1100px; margin:0 auto; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
     .brand { font-weight:700; color:white; text-decoration:none; display:flex; align-items:center; gap:10px; }
-    .brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
+    .brand-logo{width:168px;max-width:42vw;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
     .nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .nav a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
     .nav a:hover { background:rgba(255,255,255,.14); }
     .nav a.active { background:var(--brand-nav-active); box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
     .team-status { color:#dbeafe; font-size:.9rem; }
-    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;}
+    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-left:4px solid var(--team-color,rgba(255,255,255,.6));border-radius:999px;padding:6px 10px;color:#fff;}
     .logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
     header { position:relative; color:white; text-align:center; padding:44px 20px; background:linear-gradient(135deg,var(--c1),var(--c2)); }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
@@ -30,25 +30,37 @@
     .progress-wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#475569;font-size:.92rem;}
     .progress-bar{width:170px;height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;}
     .progress-bar span{display:block;height:100%;background:var(--c1);border-radius:999px;}
-    .filters{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 18px;}
+    .filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin:12px 0 18px;}
+    .filter-group{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+    .filter-label{font-size:.78rem;font-weight:800;text-transform:uppercase;color:#64748b;margin-right:2px;}
     .filter-pill{border:1px solid #cbd5e1;background:white;color:#334155;border-radius:999px;padding:7px 11px;cursor:pointer;font-weight:700;font-size:.88rem;}
     .filter-pill.active{background:var(--c1);color:white;border-color:var(--c1);}
+    .filter-pill.easy{border-color:#86efac;color:#166534;}
+    .filter-pill.medium{border-color:#fde68a;color:#92400e;}
+    .filter-pill.hard{border-color:#fecaca;color:#991b1b;}
+    .filter-pill.easy.active{background:#16a34a;color:white;}
+    .filter-pill.medium.active{background:#d97706;color:white;}
+    .filter-pill.hard.active{background:#dc2626;color:white;}
     .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
-    .card { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:18px; box-shadow:0 4px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:12px; }
+    .card { background:white; border:1px solid #e2e8f0; border-radius:10px; padding:18px; box-shadow:0 4px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:12px; text-decoration:none; color:inherit; min-height:190px; }
+    a.card{cursor:pointer;}
+    a.card:hover{border-color:var(--c1);box-shadow:0 10px 24px rgba(15,23,42,.09);transform:translateY(-1px);}
+    a.card:focus-visible{outline:3px solid color-mix(in srgb, var(--c1) 38%, white);outline-offset:3px;}
     .card.solved-card{border-color:#86efac;background:#f7fef9;}
     .title { font-size:1.05rem; font-weight:800; }
     .meta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .badge { display:inline-flex; align-items:center; padding:4px 9px; border-radius:999px; font-size:.82rem; font-weight:700; }
     .easy{ background:#dcfce7; color:#166534; }
-    .medium{ background:#fef9c3; color:#854d0e; }
+    .medium{ background:#fef3c7; color:#92400e; }
     .hard{ background:#fee2e2; color:#991b1b; }
-    .points{ background:#e0f2fe; color:#075985; }
-    .solved{ background:#dcfce7; color:#166534; }
+    .points.easy{ background:#dcfce7; color:#166534; }
+    .points.medium{ background:#fef3c7; color:#92400e; }
+    .points.hard{ background:#fee2e2; color:#991b1b; }
+    .solved{ background:#f0fdf4; color:#166534; border:1px solid #22c55e; }
     .open{ background:#f1f5f9; color:#475569; }
-    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
-    .btn { background:var(--c1); color:white; border:0; border-radius:8px; padding:10px 12px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; }
-    .btn.secondary { background:#e2e8f0; color:#0f172a; padding:8px 10px; font-size:.9rem; }
+    .open-link{margin-top:auto;color:#0f766e;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
     .small-meta{color:#64748b;font-size:.88rem;display:flex;gap:10px;flex-wrap:wrap;min-height:1.2em;}
+    .btn { background:var(--c1); color:white; border:0; border-radius:8px; padding:10px 12px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; }
     .btn.light { background:#e2e8f0; color:#0f172a; }
     .empty { background:white; border-radius:8px; padding:20px; border:1px solid #e2e8f0; }
   </style>
@@ -56,14 +68,14 @@
 <body>
   <div class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/"><img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib"><span>Crypto-Carib</span></a>
+      <a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/logo (1).png') }}" alt="Crypto-Carib"></a>
       <nav class="nav" aria-label="Hoofdnavigatie">
         <a href="/">Home</a>
         <a class="active" href="/challenges">Opdrachten</a>
         <a href="/scoreboard">Scoreboard</a>
-        <a href="/scoreboard/islands">Groepsranking</a>
+        <a href="/scoreboard/islands">Eilandranking</a>
         {% if current_team_status %}
-          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} &middot; {{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
+          <span class="team-status team-pill" style="--team-color:{{ current_team_status.color }}"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} &middot; {{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
         {% endif %}
       </nav>
     </div>
@@ -72,7 +84,7 @@
   <header>
     <h1>Opdrachten</h1>
     {% if team_logged_in %}
-      <p>Kies vrij een opdracht, verdeel ze binnen je team en dien daarna je flag in.</p>
+      <p>Kies vrij een opdracht en verdeel ze binnen je team.</p>
     {% else %}
       <p>Kies eerst je team om opdrachten te openen, downloaden en flags in te dienen.</p>
     {% endif %}
@@ -102,22 +114,30 @@
 
     {% if challenges %}
       <div class="filters" aria-label="Opdrachtfilters">
-        <button class="filter-pill active" type="button" data-filter="all">Alle</button>
-        <button class="filter-pill" type="button" data-filter="open">Open</button>
-        <button class="filter-pill" type="button" data-filter="solved">Opgelost</button>
-        <button class="filter-pill" type="button" data-filter="makkelijk">Makkelijk</button>
-        <button class="filter-pill" type="button" data-filter="gemiddeld">Gemiddeld</button>
-        <button class="filter-pill" type="button" data-filter="moeilijk">Moeilijk</button>
+        <div class="filter-group">
+          <span class="filter-label">Status</span>
+          <button class="filter-pill active" type="button" data-filter="all">Alle</button>
+          <button class="filter-pill" type="button" data-filter="open">Open</button>
+          <button class="filter-pill" type="button" data-filter="solved">Opgelost</button>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Niveau</span>
+          <button class="filter-pill easy" type="button" data-filter="makkelijk">Makkelijk</button>
+          <button class="filter-pill medium" type="button" data-filter="gemiddeld">Gemiddeld</button>
+          <button class="filter-pill hard" type="button" data-filter="moeilijk">Moeilijk</button>
+        </div>
       </div>
       <div class="grid">
         {% for c in challenges %}
-          <article class="card {% if c.solved %}solved-card{% endif %}" data-status="{% if c.solved %}solved{% else %}open{% endif %}" data-difficulty="{{ c.difficulty }}">
+          {% set detail_url = url_for('ch.challenge_detail', cid=c.slug) if c.has_files else c.pdf_url %}
+          {% set card_tag = 'a' if team_logged_in and detail_url else 'article' %}
+          <{{ card_tag }} class="card challenge-card {% if c.solved %}solved-card{% endif %}" {% if team_logged_in and detail_url %}href="{{ detail_url }}"{% if not c.has_files %} target="_blank" rel="noopener"{% endif %}{% endif %} data-status="{% if c.solved %}solved{% else %}open{% endif %}" data-difficulty="{{ c.difficulty }}">
             <div class="title">{{ c.title }}</div>
             <div class="meta">
               <span class="badge {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.difficulty }}</span>
-              <span class="badge points">{{ c.points }} pt</span>
+              <span class="badge points {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.points }} pt</span>
               {% if c.solved %}
-                <span class="badge solved">Opgelost</span>
+                <span class="badge solved">✓ Opgelost</span>
               {% else %}
                 <span class="badge open">Open</span>
               {% endif %}
@@ -131,18 +151,12 @@
               {% if c.has_attachments %}<span>{{ c.attachments_count }} bijlage{% if c.attachments_count != 1 %}n{% endif %}</span>{% endif %}
             </div>
 
-            <div class="actions">
-              {% if team_logged_in %}
-                {% if c.has_files %}
-                  <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.slug) }}">{% if c.solved %}Bekijk opdracht{% else %}Open opdracht{% endif %}</a>
-                {% elif c.pdf_url %}
-                  <a class="btn" href="{{ c.pdf_url }}" target="_blank" rel="noopener">Open opdracht</a>
-                {% endif %}
-              {% else %}
-                <a class="btn light" href="/">Kies eerst je team</a>
-              {% endif %}
-            </div>
-          </article>
+            {% if team_logged_in and detail_url %}
+              <span class="open-link">{% if c.solved %}Bekijk opdracht{% else %}Open opdracht{% endif %} ›</span>
+            {% else %}
+              <span class="open-link">Kies eerst je team ›</span>
+            {% endif %}
+          </{{ card_tag }}>
         {% endfor %}
       </div>
     {% else %}
