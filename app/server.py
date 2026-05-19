@@ -7,6 +7,7 @@ import secrets
 import io
 import datetime
 import hashlib
+import random
 from collections import defaultdict
 
 from flask import (
@@ -18,7 +19,7 @@ from flask_limiter.util import get_remote_address
 
 from database import db
 from models import sha256_hex, DIFFICULTY_POINTS, flag_hash_candidates
-from challenges import ch
+from challenges import ch, find_challenge, slugify
 
 # =========================
 # Config
@@ -168,11 +169,17 @@ def current_team_status():
             "SELECT COUNT(*) AS c FROM solves WHERE team_id=?",
             (team["id"],)
         ).fetchone()["c"]
+        active_challenges = conn.execute(
+            "SELECT COUNT(*) AS c FROM challenges WHERE is_active=1"
+        ).fetchone()["c"]
+    progress_pct = int((solved_count / active_challenges) * 100) if active_challenges else 0
     return {
         "id": team["id"],
         "name": team["name"],
         "score": team["score"],
         "solved_count": solved_count,
+        "active_challenge_count": active_challenges,
+        "progress_pct": progress_pct,
         "color": team_color(team["name"]),
         "icon": team_icon(team["name"]),
     }
@@ -204,6 +211,78 @@ def get_ctf_end_iso() -> str:
     with db() as conn:
         row = conn.execute("SELECT value FROM settings WHERE key='ctf_end_iso'").fetchone()
     return (row["value"] if row else None) or CTF_END_ISO
+
+def _active_challenge_count(conn) -> int:
+    return conn.execute("SELECT COUNT(*) AS c FROM challenges WHERE is_active=1").fetchone()["c"]
+
+def _recent_solve_feed(conn, limit: int = 10):
+    rows = conn.execute("""
+        SELECT
+          strftime('%H:%M', s.solved_at) AS t,
+          t.name AS team,
+          c.title AS title,
+          c.points AS points
+        FROM solves s
+        JOIN teams t ON t.id = s.team_id
+        JOIN challenges c ON c.id = s.challenge_id
+        ORDER BY s.solved_at DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    return [
+        {
+            "time": r["t"],
+            "team": r["team"],
+            "icon": team_icon(r["team"]),
+            "color": team_color(r["team"]),
+            "title": r["title"],
+            "points": r["points"],
+            "text": f"{team_icon(r['team'])} {r['team']} loste {r['title']} op",
+        }
+        for r in rows
+    ]
+
+def leaderboard_snapshot():
+    with db() as conn:
+        teams_full = conn.execute("""
+            SELECT id, name, score, logo
+            FROM teams
+            ORDER BY score DESC, name ASC
+        """).fetchall()
+        solves = conn.execute("""
+            SELECT team_id, COUNT(*) AS c
+            FROM solves
+            GROUP BY team_id
+        """).fetchall()
+        active_challenges = _active_challenge_count(conn)
+        total_solves = conn.execute("SELECT COUNT(*) AS c FROM solves").fetchone()["c"]
+        active_teams = conn.execute("SELECT COUNT(*) AS c FROM teams").fetchone()["c"]
+        recent_solves = _recent_solve_feed(conn, 12)
+
+    scount = {r["team_id"]: r["c"] for r in solves if r["team_id"] is not None}
+    ranking = []
+    for t in teams_full:
+        solves_count = scount.get(t["id"], 0)
+        ranking.append({
+            "id": t["id"],
+            "name": t["name"],
+            "score": t["score"],
+            "logo": t["logo"],
+            "solves": solves_count,
+            "color": team_color(t["name"]),
+            "icon": team_icon(t["name"]),
+            "progress_pct": int((solves_count / active_challenges) * 100) if active_challenges else 0,
+        })
+
+    return {
+        "teams": teams_full,
+        "ranking": ranking,
+        "scount": scount,
+        "podium": ranking[:3],
+        "active_challenges": active_challenges,
+        "total_solves": total_solves,
+        "active_teams": active_teams,
+        "recent_solves": recent_solves,
+    }
 
 
 @app.context_processor
@@ -257,6 +336,41 @@ def home():
 def logout():
     session.pop("team_token", None)
     return redirect(url_for("home", logged_out="1"))
+
+@app.get("/random-challenge")
+def random_challenge():
+    team = current_team()
+    if not team:
+        return redirect(url_for("home", login_required="challenges"))
+
+    with db() as conn:
+        solved = {
+            r["challenge_id"]
+            for r in conn.execute(
+                "SELECT challenge_id FROM solves WHERE team_id=?",
+                (team["id"],)
+            ).fetchall()
+        }
+        rows = conn.execute("""
+            SELECT id, title
+            FROM challenges
+            WHERE is_active=1
+            ORDER BY id ASC
+        """).fetchall()
+
+    remaining = []
+    for row in rows:
+        if row["id"] in solved:
+            continue
+        slug = slugify(row["title"])
+        if find_challenge(row["title"]) or find_challenge(slug):
+            remaining.append({"id": row["id"], "title": row["title"], "slug": slug})
+
+    if not remaining:
+        return render_template("random_done.html", theme=get_theme()), 200
+
+    chosen = random.choice(remaining)
+    return redirect(url_for("ch.challenge_detail", cid=chosen["slug"]))
 
 @app.post("/join")
 @limiter.limit("30 per hour")
@@ -361,31 +475,22 @@ def api_submit():
 @app.get("/scoreboard")
 @limiter.limit("120 per hour")
 def scoreboard():
-    with db() as conn:
-        teams_full = conn.execute("""
-            SELECT id, name, score, logo
-            FROM teams
-            ORDER BY score DESC, name ASC
-        """).fetchall()
-        solves = conn.execute("""
-            SELECT team_id, COUNT(*) AS c
-            FROM solves
-            GROUP BY team_id
-        """).fetchall()
+    board = leaderboard_snapshot()
+    return render_template(
+        "scoreboard.html",
+        teams=board["teams"],
+        scount=board["scount"],
+        podium=board["podium"],
+        active_challenges=board["active_challenges"],
+        recent_solves=board["recent_solves"],
+        theme=get_theme(),
+    )
 
-    scount = {r["team_id"]: r["c"] for r in solves if r["team_id"] is not None}
-    podium = [
-        {
-            "id": t["id"],
-            "name": t["name"],
-            "score": t["score"],
-            "solves": scount.get(t["id"], 0),
-            "color": team_color(t["name"]),
-            "icon": team_icon(t["name"]),
-        }
-        for t in teams_full[:3]
-    ]
-    return render_template("scoreboard.html", teams=teams_full, scount=scount, podium=podium, theme=get_theme())
+@app.get("/live")
+@limiter.limit("120 per hour")
+def live_board():
+    board = leaderboard_snapshot()
+    return render_template("live.html", **board, theme=get_theme())
 
 @app.get("/scoreboard/islands")
 def scoreboard_islands():
@@ -422,7 +527,7 @@ def api_ticker():
             LIMIT 10
         """).fetchall()
 
-    items = [f"{r['t']} - {team_icon(r['team'])} {r['team']} solved \"{r['title']}\" (+{r['points']})" for r in rows]
+    items = [f"{r['t']} - {team_icon(r['team'])} {r['team']} loste {r['title']} op (+{r['points']})" for r in rows]
     return no_store(jsonify({"items": items}))
 
 @app.get("/api/scoreboard")

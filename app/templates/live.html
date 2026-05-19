@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="15">
+  <title>Crypto-Carib Live</title>
+  <style>
+    :root{
+      --c1: {{ theme.c1|default('#037e8d') }};
+      --c2: {{ theme.c2|default('#f3b118') }};
+      --nav: linear-gradient(135deg, {{ theme.c1|default('#037e8d') }}, {{ theme.c2|default('#f3b118') }});
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:system-ui,sans-serif;background:#07111f;color:#e5f3ff;}
+    .page{min-height:100vh;padding:28px;display:grid;grid-template-rows:auto 1fr;gap:20px;background:
+      radial-gradient(circle at 10% 10%, rgba(20,184,166,.24), transparent 28%),
+      radial-gradient(circle at 86% 14%, rgba(59,130,246,.20), transparent 30%),
+      #07111f;}
+    .top{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;}
+    .brand{display:flex;align-items:center;gap:16px;}
+    .brand img{width:64px;height:64px;object-fit:contain;border-radius:14px;background:rgba(255,255,255,.94);padding:5px;}
+    h1{font-size:clamp(2rem,4vw,4rem);margin:0;letter-spacing:0;}
+    .status{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;}
+    .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:12px 16px;min-width:150px;}
+    .stat b{display:block;font-size:1.35rem;color:#fff;}
+    .stat span{color:#b8d2e8;font-size:.9rem;}
+    .board{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:20px;min-height:0;}
+    .panel{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:18px;box-shadow:0 14px 40px rgba(0,0,0,.22);}
+    .podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:end;margin-top:14px;}
+    .podium-card{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);border-top:5px solid var(--team-color,var(--c2));border-radius:18px;padding:20px;min-height:190px;display:grid;align-content:center;gap:8px;}
+    .podium-card.first{min-height:245px;background:rgba(255,255,255,.14);}
+    .rank{font-size:1.5rem;color:#bfdbfe;font-weight:900;}
+    .team-icon{font-size:2rem;}
+    .team-name{font-size:clamp(1.25rem,2.2vw,2rem);font-weight:900;color:#fff;overflow-wrap:anywhere;}
+    .team-meta{color:#cbd5e1;font-size:1.05rem;}
+    .progress{height:8px;background:rgba(255,255,255,.14);border-radius:999px;overflow:hidden;margin-top:4px;}
+    .progress span{display:block;height:100%;background:var(--team-color,var(--c2));border-radius:999px;}
+    .side{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:20px;min-height:0;}
+    .ranking,.feed{display:grid;gap:9px;align-content:start;overflow:hidden;}
+    h2{margin:0 0 10px;font-size:1.25rem;color:#fff;}
+    .row,.feed-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.07);}
+    .row-name,.feed-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .row-score{font-weight:800;color:#fff;}
+    .empty{color:#bdd7ee;background:rgba(255,255,255,.07);border-radius:12px;padding:14px;}
+    .footer{font-size:.85rem;color:#93b3cc;text-align:right;margin-top:8px;}
+    @media (max-width:900px){.top,.board{grid-template-columns:1fr}.podium{grid-template-columns:1fr}.side{grid-template-rows:auto}.page{padding:16px}.status{justify-content:flex-start;}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="top">
+      <div class="brand">
+        <img src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib">
+        <div>
+          <h1>Crypto-Carib Live</h1>
+          <div id="live-countdown" style="color:#b8d2e8;font-size:1.1rem;">Live scoreboard</div>
+        </div>
+      </div>
+      <section class="status" aria-label="Game status">
+        <div class="stat"><b>{{ total_solves }}</b><span>totaal opgelost</span></div>
+        <div class="stat"><b>{{ active_teams }}</b><span>actieve teams</span></div>
+        <div class="stat"><b>{{ active_challenges }}</b><span>opdrachten</span></div>
+      </section>
+    </header>
+
+    <section class="board">
+      <div class="panel">
+        <h2>Podium</h2>
+        {% if podium %}
+          <div class="podium">
+            {% for p in podium %}
+              <article class="podium-card {% if loop.index == 1 %}first{% endif %}" style="--team-color:{{ p.color }}">
+                <div class="rank">#{{ loop.index }}</div>
+                <div class="team-icon">{{ p.icon }}</div>
+                <div class="team-name">{{ p.name }}</div>
+                <div class="team-meta">{{ p.score }} punten - {{ p.solves }} opgelost</div>
+                <div class="progress" aria-hidden="true"><span style="width:{{ p.progress_pct }}%"></span></div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty">Nog geen teams op het podium.</div>
+        {% endif %}
+      </div>
+
+      <aside class="side">
+        <section class="panel">
+          <h2>Ranking</h2>
+          <div class="ranking">
+            {% for t in ranking %}
+              <div class="row" style="--team-color:{{ t.color }}">
+                <span>#{{ loop.index }}</span>
+                <span class="row-name"><span style="color:{{ t.color }}">{{ t.icon }}</span> {{ t.name }}</span>
+                <span class="row-score">{{ t.score }}</span>
+              </div>
+            {% else %}
+              <div class="empty">Nog geen teams.</div>
+            {% endfor %}
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Live activity</h2>
+          <div class="feed">
+            {% for item in recent_solves %}
+              <div class="feed-item">
+                <span>{{ item.time }}</span>
+                <span class="feed-text"><span style="color:{{ item.color }}">{{ item.icon }}</span> {{ item.team }} loste {{ item.title }} op</span>
+                <span>+{{ item.points }}</span>
+              </div>
+            {% else %}
+              <div class="empty">Nog geen solves... de teams zijn aan het puzzelen.</div>
+            {% endfor %}
+          </div>
+        </section>
+      </aside>
+    </section>
+    <div class="footer">Verversing elke 15 seconden</div>
+  </main>
+
+  <script>
+    const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
+    const el = document.getElementById("live-countdown");
+    function tick(){
+      if (!el || Number.isNaN(end)) return;
+      const diff = end - Date.now();
+      if (diff <= 0) {
+        el.textContent = "Game over";
+        return;
+      }
+      const h = Math.floor(diff / (1000*60*60));
+      const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+      const s = Math.floor((diff % (1000*60)) / 1000);
+      el.textContent = `Eindigt over ${h}u ${m}m ${s}s`;
+    }
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>

@@ -45,6 +45,9 @@
     .steps li { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #e2e8f0; }
     .steps li:last-child { border-bottom:0; }
     .step-n { flex:0 0 auto; width:28px; height:28px; border-radius:999px; background:#ccfbf1; color:#115e59; display:grid; place-items:center; font-weight:800; }
+    .progress-wrap{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#475569;font-size:.95rem;}
+    .progress-bar{width:190px;height:9px;background:#dbeafe;border-radius:999px;overflow:hidden;}
+    .progress-bar span{display:block;height:100%;background:var(--c1);border-radius:999px;}
     .sr-only{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;}
     .ticker-wrap {position:sticky;top:0;z-index:50;overflow:hidden;white-space:nowrap;background:rgba(0,0,0,.04);padding:0 12px;border-bottom:1px solid #e5e7eb}
     .ticker {display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite}
@@ -57,13 +60,12 @@
     <div class="topbar-inner">
       <a class="brand" href="/"><img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib"><span>Crypto-Carib</span></a>
       <nav class="nav" aria-label="Hoofdnavigatie">
-        <a class="active" href="/">🏠 Home</a>
-        <a href="/challenges">📜 Opdrachten</a>
-        <a href="/submit">🚩 Submit flag</a>
-        <a href="/scoreboard">🏆 Scoreboard</a>
-        <a href="/scoreboard/islands">🏝️ Groepsranking</a>
+        <a class="active" href="/">Home</a>
+        <a href="/challenges">Opdrachten</a>
+        <a href="/scoreboard">Scoreboard</a>
+        <a href="/scoreboard/islands">Groepsranking</a>
         {% if current_team_status %}
-          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
+          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} &middot; {{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
         {% endif %}
       </nav>
     </div>
@@ -84,9 +86,13 @@
     {% if current_team_status %}
       <div class="card info">
         <strong>Je speelt als: {{ current_team_status.name }}</strong>
+        <div class="progress-wrap">
+          <span>{{ current_team_status.solved_count }} van {{ current_team_status.active_challenge_count }} opdrachten opgelost</span>
+          <span class="progress-bar" aria-hidden="true"><span style="width:{{ current_team_status.progress_pct }}%"></span></span>
+        </div>
         <div class="actions">
           <a class="btn" href="/challenges">Opdrachten</a>
-          <a class="btn secondary" href="/submit">Submit flag</a>
+          <a class="btn secondary" href="/random-challenge">Random opdracht</a>
           <a class="btn light" href="/scoreboard">Scoreboard</a>
         </div>
       </div>
@@ -164,8 +170,8 @@
       const el = document.getElementById("live-ticker");
       if (!el) return;
       const text = (data.items && data.items.length)
-        ? " " + data.items.join("   •   ")
-        : "Nog geen solves... succes!";
+        ? " " + data.items.join("   *   ")
+        : "Nog geen solves... de teams zijn aan het puzzelen.";
       el.textContent = text;
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
     } catch(e) {}

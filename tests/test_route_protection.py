@@ -160,6 +160,45 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('aria-label="Podium"', body)
         self.assertIn("<table>", body)
+        self.assertIn('href="/live"', body)
+
+    def test_live_board_is_public_and_safe(self):
+        with db() as conn:
+            join_code = conn.execute(
+                "SELECT join_code FROM teams WHERE id=?",
+                (self.team_id,),
+            ).fetchone()["join_code"]
+        response = self.client.get("/live")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Crypto-Carib Live", body)
+        self.assertIn("Podium", body)
+        self.assertNotIn(join_code, body)
+        self.assertNotIn("CTF{", body)
+
+    def test_random_challenge_requires_login(self):
+        response = self.client.get("/random-challenge", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/?login_required=challenges", response.location)
+
+    def test_random_challenge_redirects_to_unsolved_challenge(self):
+        self.login()
+        response = self.client.get("/random-challenge", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/challenge/ctf01-voorbeeldvraag", response.location)
+
+    def test_random_challenge_all_done_message(self):
+        self.login()
+        with db() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO solves(team_id, challenge_id) VALUES(?,?)",
+                (self.team_id, self.ctf01_id),
+            )
+        response = self.client.get("/random-challenge")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Jullie hebben alle opdrachten opgelost!", body)
+        self.assertIn("Scoreboard bekijken", body)
 
     def test_challenges_overview_keeps_pdf_secondary(self):
         self.login()
@@ -170,6 +209,17 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertNotIn("Flag indienen</a>", body)
         self.assertIn("PDF beschikbaar", body)
         self.assertIn("Open opdracht", body)
+        self.assertIn("Random opdracht", body)
+        self.assertIn('data-filter="open"', body)
+        self.assertIn("Jullie voortgang:", body)
+
+    def test_detail_success_feedback_and_random_action_render(self):
+        self.login()
+        response = self.client.get("/challenge/ctf01-voorbeeldvraag")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("success-pulse", body)
+        self.assertIn('href="/random-challenge"', body)
 
     def test_home_team_cards_render_with_icon_and_color(self):
         response = self.client.get("/")

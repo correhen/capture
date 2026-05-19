@@ -299,12 +299,19 @@ def challenges_index():
             "has_files": bool(folder),
             "has_pdf": bool(assets["pdfs"]),
             "has_attachments": bool(assets["attachments"]),
+            "attachments_count": len(assets["attachments"]),
         })
+    progress = {
+        "solved": sum(1 for c in challenges if c["solved"]),
+        "total": len(challenges),
+    }
+    progress["pct"] = int((progress["solved"] / progress["total"]) * 100) if progress["total"] else 0
 
     return render_template(
         "challenges.html",
         challenges=challenges,
         team_logged_in=team is not None,
+        progress=progress,
         theme=get_theme(),
     )
 
