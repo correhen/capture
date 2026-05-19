@@ -7,9 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
   <style>
-    
+:root{--brand-primary:{{ theme.c1 }};--brand-secondary:{{ theme.c2 }};--brand-nav-bg:linear-gradient(135deg, {{ theme.c1 }}, {{ theme.c2 }});--brand-nav-active:rgba(255,255,255,.18);}
   .btn{
-  background:#0f766e;color:#fff;border:0;border-radius:10px;
+  background:var(--brand-primary);color:#fff;border:0;border-radius:10px;
   padding:12px 18px;display:inline-flex;align-items:center;gap:8px;
   text-decoration:none;transition:transform .05s ease, filter .2s;
 }
@@ -18,13 +18,17 @@
 .team-status{font-size:.9rem;color:#dbeafe;}
 .nav-link{padding:8px 10px;border-radius:8px;text-decoration:none;color:#fff;}
 .nav-link:hover{background:rgba(255,255,255,.12);}
+.brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
 </style>
 <body class="bg-slate-50 text-slate-800">
 
   <!-- Navigatiebalk -->
-  <header class="bg-slate-900 text-white p-4">
+  <header class="text-white p-4" style="background:var(--brand-nav-bg)">
     <div class="max-w-5xl mx-auto flex justify-between items-center gap-4 flex-wrap">
-      <a href="/" class="font-bold text-lg">Capture The Flag - Caribbean Edition</a>
+      <a href="/" class="font-bold text-lg flex items-center gap-2 no-underline text-white">
+        <img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib">
+        <span>Crypto-Carib</span>
+      </a>
       <nav class="flex items-center gap-3 flex-wrap">
         <a href="/" class="nav-link">🏠 Home</a>
         <a href="/challenges" class="nav-link">📜 Opdrachten</a>

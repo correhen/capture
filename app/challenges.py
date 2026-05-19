@@ -1,9 +1,11 @@
 # app/challenges.py
 from __future__ import annotations
-import io, re, zipfile, unicodedata
+import html, io, re, zipfile, unicodedata
 from pathlib import Path
 from typing import Iterable, List, Tuple, Optional, Dict
 
+import markdown
+from markupsafe import Markup
 from flask import (
     Blueprint, abort, send_from_directory, send_file,
     session, redirect, url_for, render_template, request
@@ -18,6 +20,11 @@ ch = Blueprint("ch", __name__, url_prefix="")
 
 # Pad naar de challenges-root
 CHALL_ROOT = Path(__file__).resolve().parent / "static" / "challenges"
+
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".m4a"}
+VIDEO_EXTS = {".mp4", ".webm", ".mov"}
+TEXT_EXTS = {".txt", ".md"}
 
 # Level-mappen die we proberen te groeperen (val terug als ze niet bestaan)
 LEVEL_DIRS = [
@@ -77,6 +84,90 @@ def list_files_recursive(root: Path) -> List[Tuple[str, Path]]:
         rel = str(p.relative_to(root)).replace("\\", "/")
         out.append((rel, p))
     return out
+
+def render_challenge_markdown(text: str) -> Markup:
+    escaped = html.escape(text or "")
+    rendered = markdown.markdown(
+        escaped,
+        extensions=["extra", "sane_lists"],
+        output_format="html",
+    )
+    rendered = re.sub(r"<img\b[^>]*>", "", rendered, flags=re.IGNORECASE)
+
+    def safe_href(match):
+        url = html.unescape(match.group(1)).strip()
+        if re.match(r"^(https?://|mailto:|/|#)", url, re.IGNORECASE):
+            return f'href="{html.escape(url, quote=True)}"'
+        return 'href="#"'
+
+    rendered = re.sub(r'href="([^"]*)"', safe_href, rendered, flags=re.IGNORECASE)
+    return Markup(rendered)
+
+def file_kind(path: Path) -> str:
+    ext = path.suffix.lower()
+    if ext in IMAGE_EXTS:
+        return "image"
+    if ext in AUDIO_EXTS:
+        return "audio"
+    if ext in VIDEO_EXTS:
+        return "video"
+    if ext == ".pdf":
+        return "pdf"
+    if ext in TEXT_EXTS:
+        return "text"
+    if ext == ".zip":
+        return "zip"
+    return "file"
+
+def is_challenge_markdown(rel: str, path: Path) -> bool:
+    return path.name.lower() == "challenge.md" and "/" not in rel
+
+def file_item(challenge_slug: str, rel: str, path: Path) -> Dict[str, object]:
+    kind = file_kind(path)
+    return {
+        "name": path.name,
+        "rel": rel,
+        "kind": kind,
+        "is_image": kind == "image",
+        "is_audio": kind == "audio",
+        "is_video": kind == "video",
+        "is_text": kind == "text",
+        "download_url": url_for("ch.challenge_download", cid=challenge_slug, relpath=rel),
+        "view_url": url_for("ch.challenge_asset", cid=challenge_slug, relpath=rel),
+    }
+
+def challenge_assets(chobj: Dict[str, object]) -> Dict[str, object]:
+    slug = chobj["slug"]
+    root = Path(chobj["path"])
+    markdown_path = root / "challenge.md"
+    markdown_html = None
+    has_markdown = markdown_path.is_file() and not _is_sensitive_file(markdown_path)
+    if has_markdown:
+        markdown_html = render_challenge_markdown(markdown_path.read_text(encoding="utf-8"))
+
+    pdfs = []
+    attachments = []
+    inline_images = []
+    for rel, path in list_files_recursive(root):
+        if _is_sensitive_file(path) or is_challenge_markdown(rel, path):
+            continue
+        item = file_item(slug, rel, path)
+        if item["kind"] == "pdf":
+            pdfs.append(item)
+        else:
+            attachments.append(item)
+            if item["kind"] == "image":
+                inline_images.append(item)
+
+    return {
+        "has_markdown": has_markdown,
+        "markdown_html": markdown_html,
+        "pdfs": pdfs,
+        "attachments": attachments,
+        "inline_images": inline_images,
+        "files_count": len(pdfs) + len(attachments) + (1 if has_markdown else 0),
+        "has_files": bool(pdfs or attachments or has_markdown),
+    }
 
 def _iter_challenge_dirs() -> Iterable[Path]:
     """Doorloop alle challenge-mappen (één niveau onder elk 'LEVEL_DIRS'-mapje).
@@ -194,6 +285,7 @@ def challenges_index():
     for row in rows:
         slug = slugify(row["title"])
         folder = find_challenge(row["title"]) or find_challenge(slug)
+        assets = challenge_assets(folder) if folder else {"pdfs": [], "attachments": [], "has_files": False}
         challenges.append({
             "id": row["id"],
             "slug": slug,
@@ -205,6 +297,8 @@ def challenges_index():
             "hint_revealed": row["hint_revealed"],
             "solved": row["id"] in solved,
             "has_files": bool(folder),
+            "has_pdf": bool(assets["pdfs"]),
+            "has_attachments": bool(assets["attachments"]),
         })
 
     return render_template(
@@ -228,20 +322,21 @@ def challenge_detail(cid: str):
     if not chobj:
         abort(404)
 
-    # Lijst van bestanden (zonder flags)
-    files = []
-    for rel, p in list_files_recursive(chobj["path"]):
-        if _is_sensitive_file(p):
-            continue
-        files.append({"name": p.name, "rel": rel})
-
     db_challenge = None
+    solved = False
     with db() as conn:
         db_challenge = conn.execute(
             "SELECT id, difficulty, points FROM challenges WHERE LOWER(title)=LOWER(?) AND is_active=1",
             (chobj["title"],)
         ).fetchone()
+        if db_challenge:
+            team = _current_team_row()
+            solved = conn.execute(
+                "SELECT 1 FROM solves WHERE team_id=? AND challenge_id=?",
+                (team["id"], db_challenge["id"])
+            ).fetchone() is not None
 
+    assets = challenge_assets(chobj)
     return render_template(
         "challenge_detail.html",
         c={
@@ -250,8 +345,9 @@ def challenge_detail(cid: str):
             "db_id": db_challenge["id"] if db_challenge else None,
             "difficulty": db_challenge["difficulty"] if db_challenge else None,
             "points": db_challenge["points"] if db_challenge else None,
+            "solved": solved,
         },
-        files=files,
+        assets=assets,
         theme=get_theme(),
     )
 
@@ -278,6 +374,25 @@ def challenge_download(cid: str, relpath: str):
     # Pad relatief t.o.v. CHALL_ROOT voor send_from_directory
     rel_from_root = target.relative_to(CHALL_ROOT).as_posix()
     return send_from_directory(CHALL_ROOT, rel_from_root, as_attachment=True)
+
+@ch.route("/challenge/<cid>/asset/<path:relpath>")
+def challenge_asset(cid: str, relpath: str):
+    if not is_team_logged_in():
+        return login_required_redirect()
+
+    chobj = find_challenge(cid)
+    if not chobj:
+        abort(404)
+
+    base = Path(chobj["path"])
+    target = secure_join(base, relpath)
+    if not target or not target.is_file():
+        abort(404)
+    if _is_sensitive_file(target) or _is_hidden_or_tech(target):
+        abort(403)
+
+    rel_from_root = target.relative_to(CHALL_ROOT).as_posix()
+    return send_from_directory(CHALL_ROOT, rel_from_root, as_attachment=False)
 
 @ch.route("/download-bundle/<cid>")
 def challenge_bundle(cid: str):

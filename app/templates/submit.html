@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flag indienen - Crypto CTF</title>
   <style>
-    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
+    :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; --brand-primary:{{ theme.c1 }}; --brand-secondary:{{ theme.c2 }}; --brand-nav-bg:linear-gradient(135deg, {{ theme.c1 }}, {{ theme.c2 }}); --brand-nav-active:rgba(255,255,255,.18); }
     body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
-    .topbar { background:#0f172a; color:white; }
+    .topbar { background:var(--brand-nav-bg); color:white; }
     .topbar-inner { max-width:1000px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-    .brand { font-weight:700; color:white; text-decoration:none; }
+    .brand { font-weight:700; color:white; text-decoration:none; display:flex; align-items:center; gap:10px; }
+    .brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
     .nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .nav a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
     .nav a:hover { background:rgba(255,255,255,.12); }
-    .nav a.active { background:rgba(20,184,166,.28); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
+    .nav a.active { background:var(--brand-nav-active); box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
     .team-status { color:#dbeafe; font-size:.9rem; }
     header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
@@ -42,7 +43,7 @@
 <body>
   <div class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="/">Crypto CTF</a>
+      <a class="brand" href="/"><img class="brand-logo" src="/static/img/crypto-carib-logo.png" alt="Crypto-Carib"><span>Crypto-Carib</span></a>
       <nav class="nav" aria-label="Hoofdnavigatie">
         <a href="/">🏠 Home</a>
         <a href="/challenges">📜 Opdrachten</a>

@@ -36,6 +36,8 @@ class RouteProtectionTests(unittest.TestCase):
             "/download-bundle/ctf01-voorbeeldvraag",
             "/download-all",
             "/static/challenges/test",
+            "/static/challenges/1%20-%20Easy/CTF01%20-%20Voorbeeldvraag/challenge.md",
+            "/challenge/ctf01-voorbeeldvraag/asset/challenge.md",
         ]
         for path in protected_paths:
             with self.subTest(path=path):
@@ -55,6 +57,35 @@ class RouteProtectionTests(unittest.TestCase):
         response = self.client.get("/submit", follow_redirects=False)
         self.assertEqual(response.status_code, 302)
         self.assertIn("/?login_required=submit", response.location)
+
+    def test_challenge_detail_renders_markdown_and_logo(self):
+        self.login()
+        response = self.client.get("/challenge/ctf01-voorbeeldvraag")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("<h1>CTF01 - Voorbeeldvraag</h1>", body)
+        self.assertIn("Welkom bij de Crypto CTF.", body)
+        self.assertIn('alt="Crypto-Carib"', body)
+
+    def test_challenge_detail_shows_fallback_without_markdown(self):
+        self.login()
+        response = self.client.get("/challenge/ctf02-exchanges")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Voor deze opdracht is nog geen webtekst beschikbaar", body)
+
+    def test_image_only_challenge_has_no_broken_pdf_button(self):
+        self.login()
+        response = self.client.get("/challenge/ctf37-rechtspraak")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Download PDF-versie van de opdracht", body)
+        self.assertIn("<img", body)
+
+    def test_logo_is_public(self):
+        response = self.client.get("/static/img/crypto-carib-logo.png")
+        self.assertEqual(response.status_code, 200)
+        response.close()
 
 
 if __name__ == "__main__":
