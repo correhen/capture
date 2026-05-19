@@ -15,16 +15,22 @@
 }
 .btn:hover{filter:brightness(1.05);}
 .btn:active{transform:translateY(1px);}
+.team-status{font-size:.9rem;color:#dbeafe;}
 </style>
 <body class="bg-slate-50 text-slate-800">
 
   <!-- Navigatiebalk -->
-  <header class="bg-cyan-700 text-white p-4">
-    <div class="max-w-5xl mx-auto flex justify-between items-center">
+  <header class="bg-slate-900 text-white p-4">
+    <div class="max-w-5xl mx-auto flex justify-between items-center gap-4 flex-wrap">
       <a href="/" class="font-bold text-lg">Capture The Flag - Caribbean Edition</a>
-      <nav class="space-x-4">
-        <a href="/submit" class="hover:underline">Submit</a>
+      <nav class="flex items-center gap-3 flex-wrap">
+        <a href="/" class="hover:underline">Home</a>
+        <a href="/challenges" class="hover:underline">Opdrachten</a>
+        <a href="/submit" class="hover:underline">Submit flag</a>
         <a href="/scoreboard" class="hover:underline">Scoreboard</a>
+        {% if current_team_status %}
+          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+        {% endif %}
       </nav>
     </div>
   </header>

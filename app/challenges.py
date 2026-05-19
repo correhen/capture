@@ -143,6 +143,13 @@ def get_theme():
         c2 = conn.execute("SELECT value FROM settings WHERE key='theme_c2'").fetchone()["value"]
     return {"c1": c1, "c2": c2}
 
+def _current_team_row():
+    token = session.get("team_token")
+    if not token:
+        return None
+    with db() as conn:
+        return conn.execute("SELECT * FROM teams WHERE token=?", (token,)).fetchone()
+
 # --------------------------------- #
 # Routes
 # --------------------------------- #
@@ -160,35 +167,49 @@ def challenges_index():
     if not is_team_logged_in():
         return redirect(url_for("submit"))
 
-    # Bouw per level een lijst
-    data: Dict[str, Dict[str, object]] = {}
+    team = _current_team_row()
+    with db() as conn:
+        rows = conn.execute("""
+            SELECT id, title, difficulty, points, pdf_url, hint, hint_revealed
+            FROM challenges
+            WHERE is_active=1
+            ORDER BY
+              CASE difficulty
+                WHEN 'makkelijk' THEN 1
+                WHEN 'gemiddeld' THEN 2
+                WHEN 'moeilijk' THEN 3
+                ELSE 4
+              END,
+              title ASC
+        """).fetchall()
+        solved = {
+            r["challenge_id"]
+            for r in conn.execute(
+                "SELECT challenge_id FROM solves WHERE team_id=?",
+                (team["id"],)
+            ).fetchall()
+        } if team else set()
 
-    if CHALL_ROOT.exists():
-        used = False
-        for level in LEVEL_DIRS:
-            base = CHALL_ROOT / level
-            if base.exists():
-                used = True
-                key = slugify(level)  # bv. "1-easy"
-                data[key] = {"label": LEVEL_LABELS.get(level, level), "challenges": []}
-                for d in sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name.lower()):
-                    data[key]["challenges"].append({
-                        "id": slugify(d.name),
-                        "title": d.name
-                    })
-        if not used:
-            # Fallback: groepeer alles onder 'Overig'
-            key = "overig"
-            data[key] = {"label": "Overig", "challenges": []}
-            for d in sorted((p for p in CHALL_ROOT.iterdir() if p.is_dir()), key=lambda p: p.name.lower()):
-                data[key]["challenges"].append({
-                    "id": slugify(d.name),
-                    "title": d.name
-                })
+    challenges = []
+    for row in rows:
+        slug = slugify(row["title"])
+        folder = find_challenge(row["title"]) or find_challenge(slug)
+        challenges.append({
+            "id": row["id"],
+            "slug": slug,
+            "title": row["title"],
+            "difficulty": row["difficulty"],
+            "points": row["points"],
+            "pdf_url": row["pdf_url"],
+            "hint": row["hint"],
+            "hint_revealed": row["hint_revealed"],
+            "solved": row["id"] in solved,
+            "has_files": bool(folder),
+        })
 
     return render_template(
         "challenges.html",
-        data=data,
+        challenges=challenges,
         theme=get_theme(),
     )
 
@@ -213,9 +234,22 @@ def challenge_detail(cid: str):
             continue
         files.append({"name": p.name, "rel": rel})
 
+    db_challenge = None
+    with db() as conn:
+        db_challenge = conn.execute(
+            "SELECT id, difficulty, points FROM challenges WHERE LOWER(title)=LOWER(?) AND is_active=1",
+            (chobj["title"],)
+        ).fetchone()
+
     return render_template(
         "challenge_detail.html",
-        c={"id": chobj["slug"], "title": chobj["title"]},
+        c={
+            "id": chobj["slug"],
+            "title": chobj["title"],
+            "db_id": db_challenge["id"] if db_challenge else None,
+            "difficulty": db_challenge["difficulty"] if db_challenge else None,
+            "points": db_challenge["points"] if db_challenge else None,
+        },
         files=files,
         theme=get_theme(),
     )

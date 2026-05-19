@@ -3,141 +3,103 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto CTF – Caribbean Edition · Challenges</title>
+  <title>Opdrachten - Crypto CTF</title>
   <style>
     :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji"; background:#f8fafc; color:#0f172a; line-height:1.5; }
-
-    /* HERO (zoals home) */
-    header {
-      position:relative; color:white; text-align:center; padding:60px 20px 40px;
-      background:linear-gradient(135deg,var(--c1),var(--c2));
-    }
-    header::before{
-      content:""; position:absolute; inset:0;
-      background:url('/static/hero-caribbean.jpg') center/cover no-repeat;
-      opacity:.25; mix-blend:overlay;
-    }
+    body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; line-height:1.5; }
+    .topbar { background:#0f172a; color:white; }
+    .topbar-inner { max-width:1100px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .brand { font-weight:700; color:white; text-decoration:none; }
+    .nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .nav a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
+    .nav a:hover, .nav a.active { background:rgba(255,255,255,.14); }
+    .team-status { color:#dbeafe; font-size:.9rem; }
+    header { position:relative; color:white; text-align:center; padding:44px 20px; background:linear-gradient(135deg,var(--c1),var(--c2)); }
+    header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
-    h1 { font-size:2.2rem; margin:0 0 .25em; }
-    header p { font-size:1.1rem; opacity:.95; margin:0; }
-
-    /* Ticker + countdown */
-    .ticker-wrap { position:sticky; top:0; z-index:50; overflow:hidden; white-space:nowrap; background:rgba(0,0,0,.04); padding:0 12px; border-bottom:1px solid #e5e7eb }
-    .ticker { display:inline-block; padding:8px 0; animation:ticker-scroll 35s linear infinite }
-    @keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
-    #countdown { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0; }
-
-    /* Layout + cards (zoals home) */
-    main { max-width:900px; margin:24px auto 60px; padding:0 20px; }
-    .card { background:white; padding:0; border-radius:16px; box-shadow:0 4px 8px rgba(0,0,0,0.05); margin-bottom:24px; overflow:hidden; }
-    .card h2 { margin:0; font-size:1.15rem; background:#f1f5f9; color:#475569; padding:14px 20px; border-bottom:1px solid #e2e8f0; }
-    .list { list-style:none; margin:0; padding:0; }
-    .row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 20px; border-top:1px solid #e5e7eb; }
-    .row:first-child { border-top:0; }
-    .title { font-weight:700; }
-
-    /* Buttons zoals op home */
-    .btn{
-      background:#0f766e; color:#fff; border:0; border-radius:10px;
-      padding:10px 14px; display:inline-flex; align-items:center; gap:8px;
-      text-decoration:none; transition:transform .05s ease, filter .2s; font-weight:600;
-    }
-    .btn:hover{ filter:brightness(1.05); }
-    .btn:active{ transform:translateY(1px); }
-
-    /* Accessiblity helpers */
-    .sr-only{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+    h1 { font-size:2.1rem; margin:0 0 .25em; }
+    header p { font-size:1.05rem; opacity:.95; margin:0; }
+    main { max-width:1100px; margin:24px auto 60px; padding:0 20px; }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
+    .card { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:18px; box-shadow:0 4px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:12px; }
+    .title { font-size:1.05rem; font-weight:800; }
+    .meta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .badge { display:inline-flex; align-items:center; padding:4px 9px; border-radius:999px; font-size:.82rem; font-weight:700; }
+    .easy{ background:#dcfce7; color:#166534; }
+    .medium{ background:#fef9c3; color:#854d0e; }
+    .hard{ background:#fee2e2; color:#991b1b; }
+    .points{ background:#e0f2fe; color:#075985; }
+    .solved{ background:#dcfce7; color:#166534; }
+    .open{ background:#f1f5f9; color:#475569; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
+    .btn { background:var(--c1); color:white; border:0; border-radius:8px; padding:10px 12px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; }
+    .btn.secondary { background:#334155; }
+    .btn.light { background:#e2e8f0; color:#0f172a; }
+    .empty { background:white; border-radius:8px; padding:20px; border:1px solid #e2e8f0; }
   </style>
 </head>
 <body>
-
-  <!-- HERO -->
-  <header>
-    <h1>📂 Challenges</h1>
-    <p>Overzicht per niveau. Klik door voor downloads &amp; details.</p>
-
-    <div style="margin-top:12px;">
-      <a class="btn" href="{{ url_for('ch.challenges_download_all') }}">⬇️ Download alle challenges (.zip)</a>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">Crypto CTF</a>
+      <nav class="nav" aria-label="Hoofdnavigatie">
+        <a href="/">Home</a>
+        <a class="active" href="/challenges">Opdrachten</a>
+        <a href="/submit">Submit flag</a>
+        <a href="/scoreboard">Scoreboard</a>
+        {% if current_team_status %}
+          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+        {% endif %}
+      </nav>
     </div>
-  </header>
-
-  <!-- Ticker -->
-  <div class="ticker-wrap">
-    <div id="live-ticker" class="ticker">⏳ Laden…</div>
   </div>
 
-  <!-- Countdown -->
-  <div id="countdown">⏳ Eindigtijd laden…</div>
+  <header>
+    <h1>Opdrachten</h1>
+    <p>Kies vrij een opdracht, verdeel ze binnen je team en dien daarna je flag in.</p>
+  </header>
 
-  <!-- CONTENT -->
   <main>
-    {% for level_slug, lvl in data.items() %}
-      <section class="card">
-        <h2>{{ lvl.label }}</h2>
+    <div class="toolbar">
+      <div>{{ challenges|length }} actieve opdrachten</div>
+      <a class="btn light" href="{{ url_for('ch.challenges_download_all') }}">Download alle opdrachten (.zip)</a>
+    </div>
 
-        {% if lvl.challenges %}
-          <ul class="list">
-            {% for c in lvl.challenges %}
-              <li class="row">
-                <div class="title">{{ c.title }}</div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                  <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.id) }}">Bekijken</a>
-                  <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ zip</a>
-                </div>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div style="padding:14px 20px; color:#64748b;">(Nog geen challenges in deze categorie)</div>
-        {% endif %}
-      </section>
-    {% endfor %}
+    {% if challenges %}
+      <div class="grid">
+        {% for c in challenges %}
+          <article class="card">
+            <div class="title">{{ c.title }}</div>
+            <div class="meta">
+              <span class="badge {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.difficulty }}</span>
+              <span class="badge points">{{ c.points }} pt</span>
+              {% if c.solved %}
+                <span class="badge solved">Opgelost</span>
+              {% else %}
+                <span class="badge open">Open</span>
+              {% endif %}
+            </div>
+
+            {% if c.hint and c.hint_revealed %}
+              <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px;color:#7c2d12">Tip: {{ c.hint }}</div>
+            {% endif %}
+
+            <div class="actions">
+              {% if c.has_files %}
+                <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.slug) }}">Open opdracht</a>
+                <a class="btn secondary" href="{{ url_for('ch.challenge_bundle', cid=c.slug) }}">Download opdracht</a>
+              {% elif c.pdf_url %}
+                <a class="btn" href="{{ c.pdf_url }}" target="_blank" rel="noopener">Open opdracht</a>
+              {% endif %}
+              <a class="btn light" href="/submit?challenge_id={{ c.id }}">Flag indienen</a>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">Er zijn nog geen actieve opdrachten.</div>
+    {% endif %}
   </main>
-
-  <script>
-  // === Countdown ===
-  // Zet server-side bij voorkeur een ISO met offset voor America/Kralendijk (UTC-4), bijv:
-  // CTF_END_ISO = "2025-09-30T20:00:00-04:00"
-  // Laat je 'm op "Z" (UTC), dan rekent de browser naar lokale tijd.
-  (function(){
-    try {
-      const iso = "{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}";
-      const end = new Date(iso).getTime();
-      const el = document.getElementById("countdown");
-      if (el && !isNaN(end)) {
-        const tick = () => {
-          const diff = end - Date.now();
-          if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
-          const h = Math.floor(diff / 3_600_000);
-          const m = Math.floor((diff % 3_600_000) / 60_000);
-          const s = Math.floor((diff % 60_000) / 1_000);
-          el.textContent = `⏳ Eindigt over ${h}u ${m}m ${s}s`;
-        };
-        tick();
-        setInterval(tick, 1000);
-      }
-    } catch(e){}
-  })();
-
-  // === Liveticker ===
-  async function fetchTicker() {
-    try {
-      const r = await fetch("/api/ticker", { cache: "no-store" });
-      const data = await r.json();
-      const el = document.getElementById("live-ticker");
-      if (!el) return;
-      const text = (data.items && data.items.length)
-        ? " 🏁 " + data.items.join("   •   ")
-        : "Nog geen solves… keep hacking! 💪";
-      el.textContent = text;
-
-      // animatie herstarten
-      el.style.animation = "none"; void el.offsetWidth; el.style.animation = "ticker-scroll 35s linear infinite";
-    } catch(e) {}
-  }
-  fetchTicker();
-  setInterval(fetchTicker, 15000);
-  </script>
 </body>
 </html>

@@ -7,6 +7,13 @@
   <style>
     :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
     body { margin:0; font-family: system-ui, sans-serif; background:#f8fafc; color:#0f172a; }
+    .topbar { background:#0f172a; color:white; }
+    .topbar-inner { max-width:900px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .brand { font-weight:700; color:white; text-decoration:none; }
+    .nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .nav a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
+    .nav a:hover, .nav a.active { background:rgba(255,255,255,.14); }
+    .team-status { color:#dbeafe; font-size:.9rem; }
     header {
       position:relative; color:white; text-align:center; padding:60px 20px 40px;
       background:linear-gradient(135deg,var(--c1),var(--c2));
@@ -36,6 +43,20 @@
   </style>
 </head>
 <body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">Crypto CTF</a>
+      <nav class="nav" aria-label="Hoofdnavigatie">
+        <a class="active" href="/">Home</a>
+        <a href="/challenges">Opdrachten</a>
+        <a href="/submit">Submit flag</a>
+        <a href="/scoreboard">Scoreboard</a>
+        {% if current_team_status %}
+          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+        {% endif %}
+      </nav>
+    </div>
+  </div>
   <header>
 
     <h1>Crypto CTF – Caribbean Edition</h1>

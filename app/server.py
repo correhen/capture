@@ -17,7 +17,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from database import db
-from models import sha256_hex, DIFFICULTY_POINTS
+from models import sha256_hex, DIFFICULTY_POINTS, flag_hash_candidates
 from challenges import ch
 
 # =========================
@@ -142,6 +142,22 @@ def current_team():
         cur = conn.execute("SELECT * FROM teams WHERE token = ?", (token,))
         return cur.fetchone()
 
+def current_team_status():
+    team = current_team()
+    if not team:
+        return None
+    with db() as conn:
+        solved_count = conn.execute(
+            "SELECT COUNT(*) AS c FROM solves WHERE team_id=?",
+            (team["id"],)
+        ).fetchone()["c"]
+    return {
+        "id": team["id"],
+        "name": team["name"],
+        "score": team["score"],
+        "solved_count": solved_count,
+    }
+
 def admin_logged_in() -> bool:
     return session.get("admin_ok") is True
 
@@ -172,6 +188,7 @@ def inject_globals():
         "CTF_END_ISO": get_ctf_end_iso(),  # <-- hier
         "team_color": team_color,
         "theme": get_theme(),
+        "current_team_status": current_team_status(),
     }
 
 
@@ -217,7 +234,7 @@ def join():
             teams = [t["name"] for t in conn.execute("SELECT name FROM teams ORDER BY name").fetchall()]
             return render_template("home.html", teams=teams, error="Onjuiste join code of team.", theme=get_theme()), 401
         session["team_token"] = row["token"]
-    return redirect(url_for("submit"))
+    return redirect(url_for("ch.challenges_index"))
 
 @app.get("/submit")
 def submit():
@@ -238,11 +255,13 @@ def submit():
                 "SELECT challenge_id FROM solves WHERE team_id=?", (team["id"],)
             ).fetchall()
         }
+    selected_challenge_id = request.args.get("challenge_id", "").strip()
     return render_template(
         "submit.html",
         team=team,
         challenges=challenges,
         solved=solved,
+        selected_challenge_id=selected_challenge_id,
         theme=get_theme()
     )
 
@@ -256,10 +275,14 @@ def api_submit():
     flag = request.form.get("flag", "").strip()
     challenge_id = request.form.get("challenge_id", "").strip()
 
-    if not flag.startswith("CTF{") or not flag.endswith("}"):
-        return jsonify({"ok": False, "correct": False, "message": "Vorm is CTF{...}."})
+    candidate_hashes = flag_hash_candidates(flag)
+    if not candidate_hashes:
+        return jsonify({
+            "ok": True,
+            "correct": False,
+            "message": "Vul een flag in. CTF{ } mag, maar hoeft niet."
+        })
 
-    flagh = sha256_hex(flag)
     with db() as conn:
         chal = conn.execute(
             "SELECT id, title, points, flag_hash FROM challenges WHERE id=? AND is_active=1",
@@ -268,15 +291,19 @@ def api_submit():
         if not chal:
             return jsonify({"ok": False, "error": "Challenge niet gevonden of inactief."}), 404
 
-        if flagh != chal["flag_hash"]:
-            return jsonify({"ok": True, "correct": False, "message": "Helaas, dat is niet de juiste flag."})
+        if chal["flag_hash"] not in candidate_hashes:
+            return jsonify({
+                "ok": True,
+                "correct": False,
+                "message": "Helaas, dat is niet de juiste flag. Controleer of je de juiste opdracht hebt gekozen en of je geen extra spaties hebt. CTF{ } is niet verplicht."
+            })
 
         existing = conn.execute(
             "SELECT 1 FROM solves WHERE team_id=? AND challenge_id=?",
             (team["id"], chal["id"])
         ).fetchone()
         if existing:
-            return jsonify({"ok": True, "correct": True, "message": "Al opgelost — geen extra punten."})
+            return jsonify({"ok": True, "correct": True, "message": "Deze opdracht was al opgelost. Geen extra punten, wel netjes teruggevonden."})
 
         cur = conn.cursor()
         cur.execute("INSERT INTO solves(team_id, challenge_id) VALUES(?,?)", (team["id"], chal["id"]))

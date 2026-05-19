@@ -1,44 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Challenge{% endblock %}
+{% block title %}Opdracht - {{ c.title }}{% endblock %}
 
 {% block content %}
-<header class="hero" style="padding: 40px 0 50px;">
-  <div class="container">
-    <a href="{{ url_for('ch.challenges_index') }}" style="text-decoration:none;">← Terug naar overzicht</a>
-    <h1 style="margin-top:8px;">{{ c.title }}</h1>
-    <p>Bestanden en downloads voor deze challenge.</p>
+<section class="bg-white rounded-lg shadow p-6">
+  <div class="mb-6">
+    <a href="{{ url_for('ch.challenges_index') }}" class="text-teal-700 font-semibold no-underline">Terug naar opdrachten</a>
+    <h1 class="text-3xl font-bold mt-3 mb-2">{{ c.title }}</h1>
+    <p class="text-slate-600">Bestanden en downloads voor deze opdracht.</p>
   </div>
-</header>
 
-<main style="max-width: 960px; margin: 24px auto 60px; padding: 0 20px;">
-  <section class="card" style="margin: 16px 0;">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div><strong>{{ c.title }}</strong></div>
-      <div>
-        <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">⬇️ Download alle files (.zip)</a>
-      </div>
+  <div class="flex justify-between items-center gap-3 flex-wrap border-y border-slate-200 py-4 mb-4">
+    <div>
+      <strong>{{ c.title }}</strong>
+      {% if c.difficulty and c.points %}
+        <div class="text-slate-500 mt-1">{{ c.difficulty }} · {{ c.points }} pt</div>
+      {% endif %}
     </div>
+    <div class="flex gap-2 flex-wrap">
+      <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Download alle files (.zip)</a>
+      {% if c.db_id %}
+        <a class="btn" href="/submit?challenge_id={{ c.db_id }}">Flag indienen</a>
+      {% endif %}
+    </div>
+  </div>
 
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;">
-
-    {% if files %}
-      <ul style="list-style:none;padding:0;margin:0;">
-        {% for f in files %}
-          <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;padding:10px 0;">
-            <!-- BESTANDSNAAM = KLIKBAAR -->
-            <a href="{{ url_for('ch.challenge_download', cid=c.id, relpath=f.rel) }}"
-               style="text-decoration:none;color:#0d9488;font-weight:500">
-              📄 {{ f.name }}
-            </a>
-
-            <!-- Optioneel: aparte downloadknop behouden -->
-            <a class="btn" href="{{ url_for('ch.challenge_download', cid=c.id, relpath=f.rel) }}">Download</a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>Geen bestanden gevonden voor deze challenge.</p>
-    {% endif %}
-  </section>
-</main>
+  {% if files %}
+    <ul class="list-none p-0 m-0">
+      {% for f in files %}
+        <li class="flex justify-between items-center gap-3 border-t border-slate-200 py-3 first:border-t-0">
+          <a href="{{ url_for('ch.challenge_download', cid=c.id, relpath=f.rel) }}"
+             class="text-teal-700 font-semibold no-underline">
+            {{ f.name }}
+          </a>
+          <a class="btn" href="{{ url_for('ch.challenge_download', cid=c.id, relpath=f.rel) }}">Download</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Geen bestanden gevonden voor deze opdracht.</p>
+  {% endif %}
+</section>
 {% endblock %}
