@@ -42,6 +42,9 @@
     .team-form{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;}
     .error { background:#fee2e2; color:#991b1b; padding:11px 12px; border-radius:8px; margin-bottom:12px; border:1px solid #fecaca; }
     .info { background:#ecfeff; color:#155e75; padding:12px; border-radius:8px; border:1px solid #a5f3fc; }
+    .play-card{border-top:5px solid var(--team-color,var(--c1));}
+    .play-title{display:flex;align-items:center;gap:10px;font-size:1.25rem;font-weight:900;color:#0f172a;}
+    .play-title .team-icon{width:42px;height:42px;}
     .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin:0; padding:0; list-style:none; }
     .steps li { display:flex; gap:10px; align-items:flex-start; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
     .step-n { flex:0 0 auto; width:28px; height:28px; border-radius:999px; background:#ccfbf1; color:#115e59; display:grid; place-items:center; font-weight:800; }
@@ -76,7 +79,11 @@
 
   <header>
     <h1>Crypto CTF - Caribbean Edition</h1>
-    <p>Kies je team, open opdrachten en scoor punten met flags.</p>
+    {% if current_team_status %}
+      <p>Open opdrachten, dien antwoorden in en volg de score.</p>
+    {% else %}
+      <p>Kies je team, open opdrachten en scoor punten met flags.</p>
+    {% endif %}
   </header>
 
   <div class="ticker-wrap">
@@ -85,72 +92,75 @@
 
   <main>
     {% if current_team_status %}
-      <div class="card info">
-        <strong>Je speelt als: {{ current_team_status.name }}</strong>
+      <div class="card info play-card" style="--team-color:{{ current_team_status.color }}">
+        <div class="play-title"><span class="team-icon">{{ current_team_status.icon }}</span><span>Je speelt als {{ current_team_status.name }}</span></div>
         <div class="progress-wrap" style="--team-color:{{ current_team_status.color }}">
-          <span>{{ current_team_status.solved_count }} van {{ current_team_status.active_challenge_count }} opdrachten opgelost</span>
+          <span>{{ current_team_status.score }} punten &middot; {{ current_team_status.solved_count }} van {{ current_team_status.active_challenge_count }} opdrachten opgelost</span>
           <span class="progress-bar" aria-hidden="true"><span style="width:{{ current_team_status.progress_pct }}%"></span></span>
         </div>
         <div class="actions">
-          <a class="btn" href="/challenges">Opdrachten</a>
+          <a class="btn" href="/challenges">Naar opdrachten</a>
           <a class="btn secondary" href="/random-challenge">Random opdracht</a>
           <a class="btn light" href="/scoreboard">Scoreboard</a>
+          <a class="btn light" href="/logout">Uitloggen</a>
         </div>
       </div>
+    {% else %}
+      <section class="card">
+        <h2>Kies je team</h2>
+        <p>Klik op je toegewezen team en vul de joincode in.</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        {% if teams %}
+          <div class="teams">
+            {% for t in teams %}
+              <article class="team-card" style="--team-color:{{ t.color }}" onclick="this.querySelector('input[name=join_code]').focus()">
+                <div class="team-head">
+                  <span class="team-icon">{{ t.icon }}</span>
+                  <div>
+                    <div class="team-name">{{ t.name }}</div>
+                  </div>
+                </div>
+                <form class="team-form" method="post" action="/join">
+                  <input type="hidden" name="team_name" value="{{ t.name }}">
+                  <label class="sr-only" for="join-code-{{ loop.index }}">Joincode voor {{ t.name }}</label>
+                  <input id="join-code-{{ loop.index }}" type="text" name="join_code" placeholder="Joincode" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+                  <button type="submit">Start</button>
+                </form>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p>Er zijn nog geen teams klaargezet.</p>
+        {% endif %}
+
+        <details class="fallback">
+          <summary>Team handmatig invullen</summary>
+          <form method="post" action="/join">
+            <label for="team_name" class="sr-only">Teamnaam</label>
+            <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required>
+            <label for="join_code" class="sr-only">Joincode</label>
+            <input id="join_code" type="text" name="join_code" placeholder="Joincode" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+            <button type="submit">Start</button>
+          </form>
+        </details>
+      </section>
     {% endif %}
 
-    <section class="card">
-      <h2>Kies je team</h2>
-      <p>Klik op je toegewezen team en vul de joincode in.</p>
-      {% if error %}<div class="error">{{ error }}</div>{% endif %}
-      {% if teams %}
-        <div class="teams">
-          {% for t in teams %}
-            <article class="team-card" style="--team-color:{{ t.color }}" onclick="this.querySelector('input[name=join_code]').focus()">
-              <div class="team-head">
-                <span class="team-icon">{{ t.icon }}</span>
-                <div>
-                  <div class="team-name">{{ t.name }}</div>
-                </div>
-              </div>
-              <form class="team-form" method="post" action="/join">
-                <input type="hidden" name="team_name" value="{{ t.name }}">
-                <label class="sr-only" for="join-code-{{ loop.index }}">Joincode voor {{ t.name }}</label>
-                <input id="join-code-{{ loop.index }}" type="text" name="join_code" placeholder="Joincode" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
-                <button type="submit">Start</button>
-              </form>
-            </article>
-          {% endfor %}
+    {% if not current_team_status %}
+      <section class="card">
+        <h2>Zo werkt het</h2>
+        <ol class="steps">
+          <li><span class="step-n">1</span><span>Kies je toegewezen team.</span></li>
+          <li><span class="step-n">2</span><span>Open een opdracht en verdeel het werk.</span></li>
+          <li><span class="step-n">3</span><span>Vul je antwoord in.</span></li>
+          <li><span class="step-n">4</span><span>Volg de score live.</span></li>
+        </ol>
+        <div class="actions">
+          <a class="btn light" href="/scoreboard">Scoreboard</a>
+          <a class="btn light" href="/scoreboard/islands">Eilandranking</a>
         </div>
-      {% else %}
-        <p>Er zijn nog geen teams klaargezet.</p>
-      {% endif %}
-
-      <details class="fallback">
-        <summary>Team handmatig invullen</summary>
-        <form method="post" action="/join">
-          <label for="team_name" class="sr-only">Teamnaam</label>
-          <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required>
-          <label for="join_code" class="sr-only">Joincode</label>
-          <input id="join_code" type="text" name="join_code" placeholder="Joincode" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
-          <button type="submit">Start</button>
-        </form>
-      </details>
-    </section>
-
-    <section class="card">
-      <h2>Zo werkt het</h2>
-      <ol class="steps">
-        <li><span class="step-n">1</span><span>Kies je toegewezen team.</span></li>
-        <li><span class="step-n">2</span><span>Open een opdracht en verdeel het werk.</span></li>
-        <li><span class="step-n">3</span><span>Vul je antwoord in.</span></li>
-        <li><span class="step-n">4</span><span>Volg de score live.</span></li>
-      </ol>
-      <div class="actions">
-        <a class="btn light" href="/scoreboard">Scoreboard</a>
-        <a class="btn light" href="/scoreboard/islands">Eilandranking</a>
-      </div>
-    </section>
+      </section>
+    {% endif %}
   </main>
 
   <script>

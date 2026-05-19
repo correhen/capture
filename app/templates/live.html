@@ -29,13 +29,17 @@
     .panel{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:18px;box-shadow:0 14px 40px rgba(0,0,0,.22);}
     .podium{display:grid;grid-template-columns:1fr 1.22fr 1fr;grid-template-areas:"second first third";gap:16px;align-items:end;margin-top:14px;}
     .podium-card{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);border-top:5px solid var(--team-color,var(--c2));border-radius:18px;padding:20px;min-height:190px;display:grid;align-content:center;gap:8px;}
-    .podium-card.rank-1{grid-area:first;min-height:265px;background:rgba(255,255,255,.14);transform:translateY(-10px);}
-    .podium-card.rank-2{grid-area:second;min-height:215px;}
-    .podium-card.rank-3{grid-area:third;min-height:198px;}
+    .podium-card.rank-1{grid-area:first;min-height:315px;background:rgba(255,255,255,.18);transform:translateY(-24px);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 22px 70px color-mix(in srgb,var(--team-color) 38%, transparent);}
+    .podium-card.rank-2{grid-area:second;min-height:195px;opacity:.92;}
+    .podium-card.rank-3{grid-area:third;min-height:178px;opacity:.9;}
     .rank{font-size:1.5rem;color:#bfdbfe;font-weight:900;}
     .team-icon{font-size:2rem;}
     .team-name{font-size:clamp(1.25rem,2.2vw,2rem);font-weight:900;color:#fff;overflow-wrap:anywhere;}
     .team-meta{color:#cbd5e1;font-size:1.05rem;}
+    .rank-1 .rank{font-size:2.35rem;color:#fde68a;}
+    .rank-1 .team-icon{font-size:3rem;}
+    .rank-1 .team-name{font-size:clamp(1.8rem,3vw,2.8rem);}
+    .rank-1 .team-meta{font-size:1.35rem;color:#fff;font-weight:900;}
     .progress{height:8px;background:rgba(255,255,255,.14);border-radius:999px;overflow:hidden;margin-top:4px;}
     .progress span{display:block;height:100%;background:var(--team-color,var(--c2));border-radius:999px;}
     .side{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:20px;min-height:0;}

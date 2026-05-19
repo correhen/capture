@@ -177,6 +177,8 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertIn("logo%20(1).png", body)
         self.assertIn('grid-template-areas:"second first third"', body)
         self.assertIn("rank-1", body)
+        self.assertIn("min-height:315px", body)
+        self.assertIn("translateY(-24px)", body)
         self.assertIn("Podium", body)
         self.assertNotIn(join_code, body)
         self.assertNotIn("CTF{", body)
@@ -266,6 +268,20 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertIn("input[name=join_code]", body)
         self.assertIn('name="join_code"', body)
         self.assertIn("--team-color:", body)
+
+    def test_logged_in_home_hides_team_login_cards(self):
+        self.login()
+        response = self.client.get("/")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Je speelt als", body)
+        self.assertIn("Naar opdrachten", body)
+        self.assertIn("Random opdracht", body)
+        self.assertIn("Scoreboard", body)
+        self.assertIn("Uitloggen", body)
+        self.assertNotIn("<h2>Kies je team</h2>", body)
+        self.assertNotIn('<article class="team-card"', body)
+        self.assertNotIn('name="join_code"', body)
 
 
 if __name__ == "__main__":
