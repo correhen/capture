@@ -16,6 +16,8 @@
     .nav a:hover { background:rgba(255,255,255,.14); }
     .nav a.active { background:var(--brand-nav-active); box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
     .team-status { color:#dbeafe; font-size:.9rem; }
+    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;}
+    .logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
     header { position:relative; color:white; text-align:center; padding:44px 20px; background:linear-gradient(135deg,var(--c1),var(--c2)); }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
@@ -36,7 +38,7 @@
     .open{ background:#f1f5f9; color:#475569; }
     .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
     .btn { background:var(--c1); color:white; border:0; border-radius:8px; padding:10px 12px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; }
-    .btn.secondary { background:#334155; }
+    .btn.secondary { background:#e2e8f0; color:#0f172a; padding:8px 10px; font-size:.9rem; }
     .btn.light { background:#e2e8f0; color:#0f172a; }
     .empty { background:white; border-radius:8px; padding:20px; border:1px solid #e2e8f0; }
   </style>
@@ -52,7 +54,7 @@
         <a href="/scoreboard">🏆 Scoreboard</a>
         <a href="/scoreboard/islands">🏝️ Groepsranking</a>
         {% if current_team_status %}
-          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Wissel team</a></span>
         {% endif %}
       </nav>
     </div>

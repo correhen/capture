@@ -13,6 +13,7 @@ os.environ["DATABASE_PATH"] = str(Path(_tmp.name) / "ctf-test.sqlite")
 
 from database import db
 from server import app
+from models import sha256_hex
 
 
 class RouteProtectionTests(unittest.TestCase):
@@ -21,6 +22,17 @@ class RouteProtectionTests(unittest.TestCase):
         self.temp_challenge_dirs = []
         with db() as conn:
             team = conn.execute("SELECT token FROM teams ORDER BY id LIMIT 1").fetchone()
+            self.team_id = conn.execute("SELECT id FROM teams ORDER BY id LIMIT 1").fetchone()["id"]
+            conn.execute("DELETE FROM solves")
+            conn.execute("DELETE FROM challenges WHERE title=?", ("CTF01 - Voorbeeldvraag",))
+            conn.execute(
+                "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,1)",
+                ("CTF01 - Voorbeeldvraag", "makkelijk", sha256_hex("CTF{TESTANSWER}"), 1),
+            )
+            self.ctf01_id = conn.execute(
+                "SELECT id FROM challenges WHERE title=? ORDER BY id DESC LIMIT 1",
+                ("CTF01 - Voorbeeldvraag",),
+            ).fetchone()["id"]
         self.team_token = team["token"]
 
     def tearDown(self):
@@ -72,6 +84,8 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertIn("<h1>CTF01 - Voorbeeldvraag</h1>", body)
         self.assertIn("Tijdens een doorzoeking werd een mnemonic phrase", body)
         self.assertIn('alt="Crypto-Carib"', body)
+        self.assertNotIn("Kraak de code, claim de vlag", body)
+        self.assertIn('id="detail-submit-form"', body)
 
     def test_challenge_detail_shows_fallback_without_markdown(self):
         challenge_dir = APP_DIR / "static" / "challenges" / "1 - Easy" / "__Test Geen Markdown"
@@ -102,6 +116,45 @@ class RouteProtectionTests(unittest.TestCase):
         response = self.client.get("/static/img/crypto-carib-logo.png")
         self.assertEqual(response.status_code, 200)
         response.close()
+
+    def test_inline_submit_accepts_correct_and_rejects_wrong_flags(self):
+        self.login()
+        wrong = self.client.post(
+            "/api/submit",
+            data={"challenge_id": str(self.ctf01_id), "flag": "verkeerd"},
+        )
+        self.assertFalse(wrong.get_json()["correct"])
+        self.assertIn("CTF{ } is niet verplicht", wrong.get_json()["message"])
+
+        correct = self.client.post(
+            "/api/submit",
+            data={"challenge_id": str(self.ctf01_id), "flag": "testanswer"},
+        )
+        self.assertTrue(correct.get_json()["correct"])
+
+    def test_submit_page_still_works(self):
+        self.login()
+        response = self.client.get(f"/submit?challenge_id={self.ctf01_id}")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Flag indienen", body)
+        self.assertIn(f'value="{self.ctf01_id}" selected', body)
+
+    def test_logout_clears_team_session(self):
+        self.login()
+        response = self.client.get("/logout", follow_redirects=True)
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Je bent uitgelogd. Kies opnieuw je team om verder te gaan.", body)
+        with self.client.session_transaction() as sess:
+            self.assertNotIn("team_token", sess)
+
+    def test_scoreboard_shows_podium_and_table(self):
+        response = self.client.get("/scoreboard")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('aria-label="Podium"', body)
+        self.assertIn("<table>", body)
 
 
 if __name__ == "__main__":

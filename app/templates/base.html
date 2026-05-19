@@ -16,6 +16,8 @@
 .btn:hover{filter:brightness(1.05);}
 .btn:active{transform:translateY(1px);}
 .team-status{font-size:.9rem;color:#dbeafe;}
+.team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;}
+.logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
 .nav-link{padding:8px 10px;border-radius:8px;text-decoration:none;color:#fff;}
 .nav-link:hover{background:rgba(255,255,255,.12);}
 .brand-logo{width:42px;height:42px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.92);padding:3px;}
@@ -36,7 +38,11 @@
         <a href="/scoreboard" class="nav-link">🏆 Scoreboard</a>
         <a href="/scoreboard/islands" class="nav-link">🏝️ Groepsranking</a>
         {% if current_team_status %}
-          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+          <span class="team-status team-pill">
+            <span>{{ current_team_status.icon }}</span>
+            <span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+            <a class="logout-link" href="/logout">Wissel team</a>
+          </span>
         {% endif %}
       </nav>
     </div>

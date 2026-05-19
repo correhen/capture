@@ -23,6 +23,8 @@
     .nav-main a:hover { background:rgba(255,255,255,.12); }
     .nav-main a.active { background:var(--brand-nav-active); box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
     .team-status { color:#dbeafe; font-size:.9rem; }
+    .team-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:6px 10px;color:#fff;}
+    .logout-link{font-size:.86rem;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);}
     header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
@@ -36,6 +38,12 @@
     .solves { font-size:.9rem; color:#475569; }
     .nav { margin-top:10px }
     .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; margin:0 4px; }
+    .podium { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:22px; align-items:end; }
+    .podium-card { background:white; border:1px solid #e2e8f0; border-radius:12px; padding:18px; box-shadow:0 4px 8px rgba(0,0,0,.05); }
+    .podium-card.first { transform:translateY(-6px); border-top:5px solid var(--c2); }
+    .podium-rank { font-size:1.8rem; }
+    .podium-name { font-size:1.1rem; font-weight:800; margin-top:6px; }
+    .podium-meta { color:#475569; margin-top:4px; }
     .ticker-wrap { overflow:hidden; white-space:nowrap; border-top:1px solid rgba(255,255,255,0.15); border-bottom:1px solid rgba(0,0,0,0.05); background:rgba(0,0,0,0.04) }
     .ticker { display:inline-block; padding:8px 0; animation:ticker-scroll 35s linear infinite }
     @keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
@@ -52,7 +60,7 @@
         <a class="active" href="/scoreboard">🏆 Scoreboard</a>
         <a href="/scoreboard/islands">🏝️ Groepsranking</a>
         {% if current_team_status %}
-          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Wissel team</a></span>
         {% endif %}
       </nav>
     </div>
@@ -75,6 +83,18 @@
   <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0;"></div>
 
   <main>
+    {% if podium %}
+      <section class="podium" aria-label="Podium">
+        {% for p in podium %}
+          <article class="podium-card {% if loop.index == 1 %}first{% endif %}">
+            <div class="podium-rank">{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% else %}🥉{% endif %} <span style="color:{{ p.color }}">{{ p.icon }}</span></div>
+            <div class="podium-name" style="color:{{ p.color }}">{{ p.name }}</div>
+            <div class="podium-meta">{{ p.score }} punten · {{ p.solves }} opgelost</div>
+          </article>
+        {% endfor %}
+      </section>
+    {% endif %}
+
     <table>
       <thead>
         <tr><th>#</th><th>Team</th><th>Score</th><th>Challenges</th></tr>
@@ -88,7 +108,7 @@
               {% if t.logo %}
                 <img src="{{ t.logo }}" alt="" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;border-radius:3px">
               {% endif %}
-              {{ t.name }}
+              {{ team_icon(t.name) }} {{ t.name }}
             </td>
             <td class="score">{{ t.score }}</td>
             <td class="solves">{{ (scount[t.id] if scount is defined and t.id in scount else 0) }}</td>
@@ -149,7 +169,7 @@
       body.innerHTML = data.map((x, i) => `
         <tr>
           <td>${i+1}</td>
-          <td class="team" style="color:${x.color}">${x.team}</td>
+          <td class="team" style="color:${x.color}">${x.icon ?? ''} ${x.team}</td>
           <td class="score">${x.score}</td>
           <td class="solves">${x.solves ?? '—'}</td>
         </tr>

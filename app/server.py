@@ -130,6 +130,20 @@ def team_color(name: str) -> str:
     b = int(h[4:6], 16) // 2 + 64
     return f"#{r:02x}{g:02x}{b:02x}"
 
+TEAM_ICONS = {
+    "Asset Avengers": "🛡️",
+    "Blockchain Busters": "⛓️",
+    "Crypto Crusaders": "⚔️",
+    "Token Titans": "🪙",
+}
+DEFAULT_TEAM_ICONS = ["🛡️", "⛓️", "⚔️", "🪙", "🔐", "💎", "🌊", "🧭"]
+
+def team_icon(name: str) -> str:
+    if name in TEAM_ICONS:
+        return TEAM_ICONS[name]
+    h = int(hashlib.md5(name.encode("utf-8")).hexdigest()[0:2], 16)
+    return DEFAULT_TEAM_ICONS[h % len(DEFAULT_TEAM_ICONS)]
+
 def no_store(resp):
     resp.headers["Cache-Control"] = "no-store, max-age=0"
     return resp
@@ -159,6 +173,8 @@ def current_team_status():
         "name": team["name"],
         "score": team["score"],
         "solved_count": solved_count,
+        "color": team_color(team["name"]),
+        "icon": team_icon(team["name"]),
     }
 
 def admin_logged_in() -> bool:
@@ -195,6 +211,7 @@ def inject_globals():
     return {
         "CTF_END_ISO": get_ctf_end_iso(),  # <-- hier
         "team_color": team_color,
+        "team_icon": team_icon,
         "theme": get_theme(),
         "current_team_status": current_team_status(),
     }
@@ -222,6 +239,8 @@ def home():
         message = "Kies eerst je team en vul de joincode in om de opdrachten te openen."
     elif request.args.get("login_required") == "submit":
         message = "Kies eerst je team voordat je een flag indient."
+    elif request.args.get("logged_out") == "1":
+        message = "Je bent uitgelogd. Kies opnieuw je team om verder te gaan."
     with db() as conn:
         teams = conn.execute("SELECT name FROM teams ORDER BY name ASC").fetchall()
     return render_template(
@@ -230,6 +249,11 @@ def home():
         error=message,
         theme=get_theme()
     )
+
+@app.get("/logout")
+def logout():
+    session.pop("team_token", None)
+    return redirect(url_for("home", logged_out="1"))
 
 @app.post("/join")
 @limiter.limit("30 per hour")
@@ -344,7 +368,18 @@ def scoreboard():
         """).fetchall()
 
     scount = {r["team_id"]: r["c"] for r in solves if r["team_id"] is not None}
-    return render_template("scoreboard.html", teams=teams_full, scount=scount, theme=get_theme())
+    podium = [
+        {
+            "id": t["id"],
+            "name": t["name"],
+            "score": t["score"],
+            "solves": scount.get(t["id"], 0),
+            "color": team_color(t["name"]),
+            "icon": team_icon(t["name"]),
+        }
+        for t in teams_full[:3]
+    ]
+    return render_template("scoreboard.html", teams=teams_full, scount=scount, podium=podium, theme=get_theme())
 
 @app.get("/scoreboard/islands")
 def scoreboard_islands():
@@ -381,7 +416,7 @@ def api_ticker():
             LIMIT 10
         """).fetchall()
 
-    items = [f"{r['t']} — {r['team']} solved “{r['title']}” (+{r['points']})" for r in rows]
+    items = [f"{r['t']} - {team_icon(r['team'])} {r['team']} solved \"{r['title']}\" (+{r['points']})" for r in rows]
     return no_store(jsonify({"items": items}))
 
 @app.get("/api/scoreboard")
@@ -405,6 +440,7 @@ def api_scoreboard():
             "team": r["name"],
             "score": r["score"],
             "color": team_color(r["name"]),
+            "icon": team_icon(r["name"]),
             "solves": scount.get(r["id"], 0),
         }
         for r in teams

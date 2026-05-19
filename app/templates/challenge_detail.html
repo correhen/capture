@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Opdracht - {{ c.title }}{% endblock %}
+{% block hero %}{% endblock %}
 
 {% block content %}
 <style>
@@ -30,6 +31,12 @@
   .preview-card audio,.preview-card video{width:100%;margin-top:8px;}
   .file-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #e2e8f0;padding:12px 0;}
   .file-row:first-child{border-top:0;}
+  .submit-input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:1rem;}
+  .submit-help{color:#64748b;font-size:.92rem;margin-top:6px;}
+  .message{display:none;padding:14px 16px;border-radius:10px;margin-top:14px;}
+  .message.success{display:block;background:#dcfce7;color:#166534;border:1px solid #86efac;}
+  .message.error{display:block;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
+  .success-actions{display:none;gap:10px;flex-wrap:wrap;margin-top:12px;}
 </style>
 
 <div class="detail-shell">
@@ -50,11 +57,12 @@
           {% else %}
             <span class="badge open">Open</span>
           {% endif %}
+          <span class="badge open">{{ assets.files_count }} bestand{% if assets.files_count != 1 %}en{% endif %}</span>
         </div>
       </div>
       <div class="actions">
         {% if c.db_id %}
-          <a class="btn" href="/submit?challenge_id={{ c.db_id }}">Flag indienen</a>
+          <a class="btn" href="#submit-flag">Flag indienen</a>
         {% endif %}
         {% if assets.has_files %}
           <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Alle bestanden van deze opdracht downloaden</a>
@@ -62,6 +70,33 @@
       </div>
     </div>
   </section>
+
+  {% if c.db_id %}
+    <section id="submit-flag" class="panel">
+      <h2 class="section-title">Flag indienen</h2>
+      {% if c.solved %}
+        <p class="text-slate-600">Deze opdracht is al opgelost door je team. Je kunt eventueel opnieuw indienen om je antwoord te controleren.</p>
+      {% else %}
+        <p class="text-slate-600">Vul je antwoord direct voor deze opdracht in. CTF{} mag, maar hoeft niet.</p>
+      {% endif %}
+      <form id="detail-submit-form" method="post" action="/api/submit">
+        <input type="hidden" name="challenge_id" value="{{ c.db_id }}">
+        <label for="detail-flag" class="font-bold">Antwoord</label>
+        <input id="detail-flag" class="submit-input" type="text" name="flag" placeholder="CTF{...} of alleen het antwoord" autocomplete="off" required>
+        <div class="submit-help">CTF{} is niet verplicht. Extra spaties aan het begin of eind worden genegeerd.</div>
+        <div class="actions">
+          <button class="btn" type="submit">Flag indienen</button>
+          <a class="btn" href="/submit?challenge_id={{ c.db_id }}">Open algemene submitpagina</a>
+        </div>
+      </form>
+      <div id="detail-submit-result" class="message" role="status"></div>
+      <div id="detail-success-actions" class="success-actions">
+        <a class="btn" href="{{ url_for('ch.challenges_index') }}">Terug naar opdrachten</a>
+        <a class="btn" href="/scoreboard">Scoreboard bekijken</a>
+        <a class="btn" href="{{ url_for('ch.challenges_index') }}">Pak nog een challenge</a>
+      </div>
+    </section>
+  {% endif %}
 
   <section class="panel">
     <h2 class="section-title">Opdracht</h2>
@@ -116,4 +151,27 @@
     {% endif %}
   </section>
 </div>
+
+<script>
+  const detailForm = document.getElementById("detail-submit-form");
+  if (detailForm) {
+    const result = document.getElementById("detail-submit-result");
+    const successActions = document.getElementById("detail-success-actions");
+    detailForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      result.className = "message";
+      result.textContent = "";
+      successActions.style.display = "none";
+
+      const response = await fetch("/api/submit", { method: "POST", body: new FormData(detailForm) });
+      const data = await response.json();
+      const correct = Boolean(data.ok && data.correct);
+      result.textContent = data.message || data.error || "Er ging iets mis bij het indienen.";
+      result.className = "message " + (correct ? "success" : "error");
+      if (correct) {
+        successActions.style.display = "flex";
+      }
+    });
+  }
+</script>
 {% endblock %}
