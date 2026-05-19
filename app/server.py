@@ -142,6 +142,9 @@ def current_team():
         cur = conn.execute("SELECT * FROM teams WHERE token = ?", (token,))
         return cur.fetchone()
 
+def team_is_logged_in() -> bool:
+    return current_team() is not None
+
 def current_team_status():
     team = current_team()
     if not team:
@@ -167,6 +170,11 @@ def get_theme():
         c1 = conn.execute("SELECT value FROM settings WHERE key='theme_c1'").fetchone()["value"]
         c2 = conn.execute("SELECT value FROM settings WHERE key='theme_c2'").fetchone()["value"]
     return {"c1": c1, "c2": c2}
+
+@app.before_request
+def protect_challenge_static_files():
+    if request.path.startswith("/static/challenges/") and not team_is_logged_in():
+        return redirect(url_for("home", login_required="challenges"))
 
 
 # =========================
@@ -209,12 +217,17 @@ def health():
 # =========================
 @app.get("/")
 def home():
+    message = None
+    if request.args.get("login_required") == "challenges":
+        message = "Kies eerst je team en vul de joincode in om de opdrachten te openen."
+    elif request.args.get("login_required") == "submit":
+        message = "Kies eerst je team voordat je een flag indient."
     with db() as conn:
         teams = conn.execute("SELECT name FROM teams ORDER BY name ASC").fetchall()
     return render_template(
         "home.html",
         teams=[t["name"] for t in teams],
-        error=None,
+        error=message,
         theme=get_theme()
     )
 
@@ -240,7 +253,7 @@ def join():
 def submit():
     t = current_team()
     if not t:
-        return redirect(url_for("home"))
+        return redirect(url_for("home", login_required="submit"))
     with db() as conn:
         team = conn.execute("SELECT * FROM teams WHERE id=?", (t["id"],)).fetchone()
         challenges = conn.execute("""
@@ -270,7 +283,7 @@ def submit():
 def api_submit():
     team = current_team()
     if not team:
-        return jsonify({"ok": False, "error": "Niet ingelogd bij een team."}), 401
+        return jsonify({"ok": False, "error": "Kies eerst je team voordat je een flag indient."}), 401
 
     flag = request.form.get("flag", "").strip()
     challenge_id = request.form.get("challenge_id", "").strip()

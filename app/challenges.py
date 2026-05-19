@@ -37,7 +37,10 @@ LEVEL_LABELS = {
 # --------------------------------- #
 
 def is_team_logged_in() -> bool:
-    return bool(session.get("team_token"))
+    return _current_team_row() is not None
+
+def login_required_redirect():
+    return redirect(url_for("home", login_required="challenges"))
 
 def slugify(text: str) -> str:
     text = unicodedata.normalize("NFKD", text)
@@ -164,9 +167,6 @@ def challenges_index():
         'challenges': [ { 'id': slug, 'title': title } ... ]
       }
     """
-    if not is_team_logged_in():
-        return redirect(url_for("submit"))
-
     team = _current_team_row()
     with db() as conn:
         rows = conn.execute("""
@@ -210,6 +210,7 @@ def challenges_index():
     return render_template(
         "challenges.html",
         challenges=challenges,
+        team_logged_in=team is not None,
         theme=get_theme(),
     )
 
@@ -221,7 +222,7 @@ def challenge_detail(cid: str):
     - context 'files' met lijst items { name, rel }
     """
     if not is_team_logged_in():
-        return redirect(url_for("submit"))
+        return login_required_redirect()
 
     chobj = find_challenge(cid)
     if not chobj:
@@ -261,7 +262,7 @@ def challenge_download(cid: str, relpath: str):
     Past bij url_for('ch.challenge_download', cid=c.id, relpath=f.rel)
     """
     if not is_team_logged_in():
-        return redirect(url_for("submit"))
+        return login_required_redirect()
 
     chobj = find_challenge(cid)
     if not chobj:
@@ -285,7 +286,7 @@ def challenge_bundle(cid: str):
     <cid> kan mapnaam, slug of pdf-stem zijn.
     """
     if not is_team_logged_in():
-        return redirect(url_for("submit"))
+        return login_required_redirect()
 
     chobj = find_challenge(cid)
     if not chobj:
@@ -311,7 +312,7 @@ def challenges_download_all():
     Download ALLE challenges als één ZIP (zonder flags).
     """
     if not is_team_logged_in():
-        return redirect(url_for("submit"))
+        return login_required_redirect()
 
     all_items: List[Tuple[str, Path]] = []
 

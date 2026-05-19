@@ -3,20 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eiland-scoreboard – Crypto CTF</title>
+  <title>Groepsranking - Crypto CTF</title>
   <style>
     :root{
       --c1: {{ theme.c1|default('#037e8d') }};
       --c2: {{ theme.c2|default('#f3b118') }};
     }
     body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
+    .topbar { background:#0f172a; color:white; }
+    .topbar-inner { max-width:900px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .brand { font-weight:700; color:white; text-decoration:none; }
+    .nav-main { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .nav-main a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
+    .nav-main a:hover { background:rgba(255,255,255,.12); }
+    .nav-main a.active { background:rgba(20,184,166,.28); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
+    .team-status { color:#dbeafe; font-size:.9rem; }
     header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
     h1 { margin:0; font-size:2rem; }
     .nav { margin-top:10px }
     .nav a { display:inline-block; padding:8px 12px; background:var(--c1); color:#fff; border-radius:8px; text-decoration:none; margin:0 4px; }
-
     main { max-width:900px; margin:24px auto 40px; padding:0 20px; }
     table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 8px rgba(0,0,0,0.05);}
     th, td { padding:14px 16px; text-align:left; }
@@ -29,20 +36,34 @@
   </style>
 </head>
 <body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">Crypto CTF</a>
+      <nav class="nav-main" aria-label="Hoofdnavigatie">
+        <a href="/">🏠 Home</a>
+        <a href="/challenges">📜 Opdrachten</a>
+        <a href="/submit">🚩 Submit flag</a>
+        <a href="/scoreboard">🏆 Scoreboard</a>
+        <a class="active" href="/scoreboard/islands">🏝️ Groepsranking</a>
+        {% if current_team_status %}
+          <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
+        {% endif %}
+      </nav>
+    </div>
+  </div>
+
   <header>
-    <h1>Eiland-scoreboard</h1>
+    <h1>Groepsranking</h1>
     <div class="nav">
-      <a href="/submit">🚀 Naar challenges</a>
-      <a href="/scoreboard">🏆 Algemeen scoreboard</a>
+      <a href="/challenges">Naar opdrachten</a>
+      <a href="/scoreboard">Algemeen scoreboard</a>
     </div>
   </header>
 
-  <!-- Liveticker -->
   <div class="ticker-wrap">
-    <div id="live-ticker" class="ticker">⏳ Laden van liveticker…</div>
+    <div id="live-ticker" class="ticker">Laden van liveticker...</div>
   </div>
 
-  <!-- Countdown -->
   <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; padding:10px 0;"></div>
 
   <main>
@@ -50,7 +71,7 @@
       <thead>
         <tr>
           <th>#</th>
-          <th>Eiland</th>
+          <th>Groep</th>
           <th>Unieke challenges opgelost</th>
         </tr>
       </thead>
@@ -69,7 +90,6 @@
   </main>
 
   <script>
-  // Countdown (CTF_END_ISO via context_processor)
   (function(){
     try {
       const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
@@ -77,17 +97,16 @@
       if (el && !isNaN(end)) {
         setInterval(() => {
           const diff = end - Date.now();
-          if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
+          if (diff <= 0) { el.textContent = "Game over!"; return; }
           const h = Math.floor(diff / (1000*60*60));
           const m = Math.floor((diff % (1000*60*60)) / (1000*60));
           const s = Math.floor((diff % (1000*60)) / 1000);
-          el.textContent = `⏳ Eindigt over ${h}u ${m}m ${s}s`;
+          el.textContent = `Eindigt over ${h}u ${m}m ${s}s`;
         }, 1000);
       }
     } catch(e){}
   })();
 
-  // Liveticker (zelfde endpoint als op het algemene scoreboard)
   async function fetchTicker() {
     try {
       const r = await fetch("/api/ticker", { cache: "no-store" });
@@ -95,10 +114,9 @@
       const el = document.getElementById("live-ticker");
       if (!el) return;
       const text = (data.items && data.items.length)
-        ? " 🏁 " + data.items.join("   •   ")
-        : "Nog geen solves… keep hacking! 💪";
+        ? " " + data.items.join("   •   ")
+        : "Nog geen solves... succes!";
       el.textContent = text;
-      // Reset animatie zodat nieuwe content weer van rechts start
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
     } catch(e) {}
   }

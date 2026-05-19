@@ -17,7 +17,7 @@
       {% endif %}
     </div>
     <div class="flex gap-2 flex-wrap">
-      <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Download alle files (.zip)</a>
+      <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Alle bestanden van deze opdracht downloaden</a>
       {% if c.db_id %}
         <a class="btn" href="/submit?challenge_id={{ c.db_id }}">Flag indienen</a>
       {% endif %}

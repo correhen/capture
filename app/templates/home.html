@@ -3,43 +3,48 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto CTF – Caribbean Edition</title>
+  <title>Crypto CTF - Caribbean Edition</title>
   <style>
     :root{ --c1: {{ theme.c1 }}; --c2: {{ theme.c2 }}; }
-    body { margin:0; font-family: system-ui, sans-serif; background:#f8fafc; color:#0f172a; }
+    body { margin:0; font-family:system-ui,sans-serif; background:#f8fafc; color:#0f172a; }
     .topbar { background:#0f172a; color:white; }
-    .topbar-inner { max-width:900px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .topbar-inner { max-width:1000px; margin:0 auto; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
     .brand { font-weight:700; color:white; text-decoration:none; }
     .nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .nav a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
-    .nav a:hover, .nav a.active { background:rgba(255,255,255,.14); }
+    .nav a:hover { background:rgba(255,255,255,.12); }
+    .nav a.active { background:rgba(20,184,166,.28); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
     .team-status { color:#dbeafe; font-size:.9rem; }
-    header {
-      position:relative; color:white; text-align:center; padding:60px 20px 40px;
-      background:linear-gradient(135deg,var(--c1),var(--c2));
-    }
-    header::before{
-      content:""; position:absolute; inset:0;
-      background:url('/static/hero-caribbean.jpg') center/cover no-repeat;
-      opacity:.25; mix-blend:overlay;
-    }
+    header { position:relative; color:white; text-align:center; padding:58px 20px 42px; background:linear-gradient(135deg,var(--c1),var(--c2)); }
+    header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
     header>*{ position:relative; z-index:1; }
-    h1 { font-size:2.2rem; margin-bottom:.2em; }
-    header p { font-size:1.1rem; opacity:.95; }
-    main { max-width:900px; margin:24px auto 60px; padding:0 20px; }
-    .card { background:white; padding:24px; border-radius:16px; box-shadow:0 4px 8px rgba(0,0,0,0.05); margin-bottom:24px; }
-    h2 { margin-top:0; font-size:1.3rem; border-bottom:1px solid #e2e8f0; padding-bottom:.3em; }
-    form { display:grid; gap:12px; margin-top:12px; }
-    input { padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; }
-    button { background:var(--c1); color:white; padding:12px; border:none; border-radius:8px; font-size:1rem; cursor:pointer; }
-    button:hover { filter:brightness(.95); }
+    h1 { font-size:2.25rem; margin:.1em 0; }
+    header p { font-size:1.1rem; opacity:.95; margin:.4em 0 0; }
+    main { max-width:1000px; margin:24px auto 60px; padding:0 20px; }
+    .grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr); gap:20px; align-items:start; }
+    .card { background:white; padding:24px; border-radius:12px; box-shadow:0 4px 8px rgba(0,0,0,0.05); margin-bottom:20px; border:1px solid #e2e8f0; }
+    .start-card { border-top:5px solid var(--c1); }
+    h2 { margin-top:0; font-size:1.3rem; border-bottom:1px solid #e2e8f0; padding-bottom:.35em; }
+    form { display:grid; gap:12px; margin-top:14px; }
+    input { padding:11px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:1rem; }
+    button, .btn { background:var(--c1); color:white; padding:11px 14px; border:none; border-radius:8px; font-size:1rem; cursor:pointer; text-decoration:none; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+    button:hover, .btn:hover { filter:brightness(.96); }
+    .btn.secondary { background:#334155; }
+    .btn.light { background:#e2e8f0; color:#0f172a; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
     .teams { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
-    .team-tag { background:#eef6ff; padding:8px 12px; border-radius:999px; font-weight:600; cursor:pointer; text-decoration:none; }
-    .error { background:#fee2e2; color:#b91c1c; padding:10px; border-radius:8px; margin-bottom:10px; }
+    .team-tag { background:#eef6ff; color:#075985; padding:8px 12px; border-radius:999px; font-weight:700; cursor:pointer; text-decoration:none; border:1px solid #bae6fd; }
+    .error { background:#fee2e2; color:#991b1b; padding:11px 12px; border-radius:8px; margin-bottom:12px; border:1px solid #fecaca; }
+    .info { background:#ecfeff; color:#155e75; padding:12px; border-radius:8px; border:1px solid #a5f3fc; }
+    .steps { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+    .steps li { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #e2e8f0; }
+    .steps li:last-child { border-bottom:0; }
+    .step-n { flex:0 0 auto; width:28px; height:28px; border-radius:999px; background:#ccfbf1; color:#115e59; display:grid; place-items:center; font-weight:800; }
     .sr-only{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;}
     .ticker-wrap {position:sticky;top:0;z-index:50;overflow:hidden;white-space:nowrap;background:rgba(0,0,0,.04);padding:0 12px;border-bottom:1px solid #e5e7eb}
     .ticker {display:inline-block;padding:8px 0;animation:ticker-scroll 35s linear infinite}
     @keyframes ticker-scroll {0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+    @media (max-width:760px){ .grid{grid-template-columns:1fr;} .topbar-inner{align-items:flex-start;} }
   </style>
 </head>
 <body>
@@ -47,49 +52,75 @@
     <div class="topbar-inner">
       <a class="brand" href="/">Crypto CTF</a>
       <nav class="nav" aria-label="Hoofdnavigatie">
-        <a class="active" href="/">Home</a>
-        <a href="/challenges">Opdrachten</a>
-        <a href="/submit">Submit flag</a>
-        <a href="/scoreboard">Scoreboard</a>
+        <a class="active" href="/">🏠 Home</a>
+        <a href="/challenges">📜 Opdrachten</a>
+        <a href="/submit">🚩 Submit flag</a>
+        <a href="/scoreboard">🏆 Scoreboard</a>
+        <a href="/scoreboard/islands">🏝️ Groepsranking</a>
         {% if current_team_status %}
           <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
         {% endif %}
       </nav>
     </div>
   </div>
+
   <header>
+    <h1>Crypto CTF - Caribbean Edition</h1>
+    <p>Kies je team, open opdrachten en scoor punten met flags.</p>
+  </header>
 
-    <h1>Crypto CTF – Caribbean Edition</h1>
-    <p>Kraak de code, claim de vlag en versla de andere teams 💥</p>
+  <div class="ticker-wrap">
+    <div id="live-ticker" class="ticker">Laden...</div>
+  </div>
 
-    </header>
-  
-    <!-- Liveticker -->
-    <div class="ticker-wrap">
-      <div id="live-ticker" class="ticker">⏳ Laden…</div>
-    </div>  
-
-  <!-- Countdown -->
   <div id="countdown" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;text-align:center;padding:10px 0;"></div>
 
   <main>
-    <div class="card">
-      <h2>Meedoen als team</h2>
-      {% if error %}<div class="error">{{ error }}</div>{% endif %}
-      <form method="post" action="/join" onkeydown="if(event.key==='Enter'){this.submit();}">
-        <label for="team_name" class="sr-only">Teamnaam</label>
-        <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required />
+    {% if current_team_status %}
+      <div class="card info">
+        <strong>Je speelt als: {{ current_team_status.name }}</strong>
+        <div class="actions">
+          <a class="btn" href="/challenges">Opdrachten</a>
+          <a class="btn secondary" href="/submit">Submit flag</a>
+          <a class="btn light" href="/scoreboard">Scoreboard</a>
+        </div>
+      </div>
+    {% endif %}
 
-        <label for="join_code" class="sr-only">Join-code</label>
-        <input id="join_code" type="text" name="join_code"
-               placeholder="Join-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required />
+    <div class="grid">
+      <section class="card start-card">
+        <h2>Kies je team</h2>
+        <p>Kies het team dat je toegewezen hebt gekregen en vul de joincode in. Daarna kun je de opdrachten openen en flags indienen.</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="post" action="/join" onkeydown="if(event.key==='Enter'){this.submit();}">
+          <label for="team_name" class="sr-only">Teamnaam</label>
+          <input id="team_name" type="text" name="team_name" placeholder="Teamnaam" required />
 
-        <button>🚀 Join</button>
-      </form>
+          <label for="join_code" class="sr-only">Join-code</label>
+          <input id="join_code" type="text" name="join_code"
+                 placeholder="Join-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required />
+
+          <button>Start met je team</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Zo werkt het</h2>
+        <ol class="steps">
+          <li><span class="step-n">1</span><span>Kies je toegewezen team en log in met de joincode.</span></li>
+          <li><span class="step-n">2</span><span>Open een opdracht en verdeel het werk binnen je groep.</span></li>
+          <li><span class="step-n">3</span><span>Dien je flag in met of zonder CTF{ }.</span></li>
+          <li><span class="step-n">4</span><span>Scoor punten voor je team en volg de ranking live.</span></li>
+        </ol>
+        <div class="actions">
+          <a class="btn light" href="/scoreboard">Scoreboard</a>
+          <a class="btn light" href="/scoreboard/islands">Groepsranking</a>
+        </div>
+      </section>
     </div>
 
-    <div class="card">
-      <h2>Teams die al meedoen</h2>
+    <section class="card">
+      <h2>Beschikbare teams</h2>
       {% if teams %}
         <div class="teams">
           {% for t in teams %}
@@ -97,33 +128,30 @@
           {% endfor %}
         </div>
       {% else %}
-        <p>Er zijn nog geen teams aangemaakt.</p>
+        <p>Er zijn nog geen teams klaargezet.</p>
       {% endif %}
-    </div>
+    </section>
   </main>
 
   <script>
-  // Prefill teamnaam bij klik
   function prefill(name){
     const input = document.querySelector('#team_name');
     if(input){ input.value = name; input.focus(); window.scrollTo({top:0, behavior:'smooth'}); }
   }
 
-  // Countdown (dagen/uren/minuten)
   const end = new Date("{{ CTF_END_ISO|default('2025-09-30T20:00:00Z') }}").getTime();
   const el = document.getElementById("countdown");
   setInterval(() => {
     const diff = end - Date.now();
-    if (diff <= 0) { el.textContent = "⏰ Game over!"; return; }
+    if (diff <= 0) { el.textContent = "Game over!"; return; }
     const days = Math.floor(diff / (1000*60*60*24));
     const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
     const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
     el.textContent = days > 0
-      ? `⏳ Eindigt over ${days}d ${hours}u ${mins}m`
-      : `⏳ Eindigt over ${hours}u ${mins}m`;
+      ? `Eindigt over ${days}d ${hours}u ${mins}m`
+      : `Eindigt over ${hours}u ${mins}m`;
   }, 1000);
 
-  // Liveticker
   async function fetchTicker() {
     try {
       const r = await fetch("/api/ticker", { cache: "no-store" });
@@ -131,8 +159,8 @@
       const el = document.getElementById("live-ticker");
       if (!el) return;
       const text = (data.items && data.items.length)
-        ? " 🏁 " + data.items.join("   •   ")
-        : "Nog geen solves… keep hacking! 💪";
+        ? " " + data.items.join("   •   ")
+        : "Nog geen solves... succes!";
       el.textContent = text;
       el.style.animation = "none"; void el.offsetWidth; el.style.animation = null;
     } catch(e) {}

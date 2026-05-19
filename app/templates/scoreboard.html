@@ -15,7 +15,8 @@
     .brand { font-weight:700; color:white; text-decoration:none; }
     .nav-main { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .nav-main a { color:white; text-decoration:none; padding:8px 10px; border-radius:8px; }
-    .nav-main a:hover, .nav-main a.active { background:rgba(255,255,255,.14); }
+    .nav-main a:hover { background:rgba(255,255,255,.12); }
+    .nav-main a.active { background:rgba(20,184,166,.28); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
     .team-status { color:#dbeafe; font-size:.9rem; }
     header { position:relative; background:linear-gradient(135deg,var(--c1),var(--c2)); color:white; padding:40px 20px; text-align:center; }
     header::before{ content:""; position:absolute; inset:0; background:url('/static/hero-caribbean.jpg') center/cover no-repeat; opacity:.25; mix-blend:overlay; }
@@ -40,10 +41,11 @@
     <div class="topbar-inner">
       <a class="brand" href="/">Crypto CTF</a>
       <nav class="nav-main" aria-label="Hoofdnavigatie">
-        <a href="/">Home</a>
-        <a href="/challenges">Opdrachten</a>
-        <a href="/submit">Submit flag</a>
-        <a class="active" href="/scoreboard">Scoreboard</a>
+        <a href="/">🏠 Home</a>
+        <a href="/challenges">📜 Opdrachten</a>
+        <a href="/submit">🚩 Submit flag</a>
+        <a class="active" href="/scoreboard">🏆 Scoreboard</a>
+        <a href="/scoreboard/islands">🏝️ Groepsranking</a>
         {% if current_team_status %}
           <span class="team-status">Team: {{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span>
         {% endif %}
@@ -55,6 +57,7 @@
     <div class="nav">
       <a href="/challenges">Naar opdrachten</a>
       <a href="/submit">Flag indienen</a>
+      <a href="/scoreboard/islands">Groepsranking</a>
     </div>
   </header>
 
