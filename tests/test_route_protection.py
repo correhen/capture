@@ -86,6 +86,8 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertIn('alt="Crypto-Carib"', body)
         self.assertNotIn("Kraak de code, claim de vlag", body)
         self.assertIn('id="detail-submit-form"', body)
+        self.assertEqual(body.count('id="detail-submit-form"'), 1)
+        self.assertNotIn("Open algemene submitpagina", body)
 
     def test_challenge_detail_shows_fallback_without_markdown(self):
         challenge_dir = APP_DIR / "static" / "challenges" / "1 - Easy" / "__Test Geen Markdown"
@@ -142,6 +144,9 @@ class RouteProtectionTests(unittest.TestCase):
 
     def test_logout_clears_team_session(self):
         self.login()
+        nav = self.client.get("/challenges").data.decode("utf-8")
+        self.assertIn("Uitloggen", nav)
+        self.assertNotIn("Wissel team", nav)
         response = self.client.get("/logout", follow_redirects=True)
         body = response.data.decode("utf-8")
         self.assertEqual(response.status_code, 200)
@@ -155,6 +160,23 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('aria-label="Podium"', body)
         self.assertIn("<table>", body)
+
+    def test_challenges_overview_keeps_pdf_secondary(self):
+        self.login()
+        response = self.client.get("/challenges")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Download PDF", body)
+        self.assertNotIn("Flag indienen</a>", body)
+        self.assertIn("PDF beschikbaar", body)
+        self.assertIn("Open opdracht", body)
+
+    def test_home_team_cards_render_with_icon_and_color(self):
+        response = self.client.get("/")
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("team-icon", body)
+        self.assertIn("--team-color:", body)
 
 
 if __name__ == "__main__":

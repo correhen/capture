@@ -245,7 +245,10 @@ def home():
         teams = conn.execute("SELECT name FROM teams ORDER BY name ASC").fetchall()
     return render_template(
         "home.html",
-        teams=[t["name"] for t in teams],
+        teams=[
+            {"name": t["name"], "icon": team_icon(t["name"]), "color": team_color(t["name"])}
+            for t in teams
+        ],
         error=message,
         theme=get_theme()
     )
@@ -268,7 +271,10 @@ def join():
             (team_name, join_code)
         ).fetchone()
         if not row:
-            teams = [t["name"] for t in conn.execute("SELECT name FROM teams ORDER BY name").fetchall()]
+            teams = [
+                {"name": t["name"], "icon": team_icon(t["name"]), "color": team_color(t["name"])}
+                for t in conn.execute("SELECT name FROM teams ORDER BY name").fetchall()
+            ]
             return render_template("home.html", teams=teams, error="Onjuiste join code of team.", theme=get_theme()), 401
         session["team_token"] = row["token"]
     return redirect(url_for("ch.challenges_index"))

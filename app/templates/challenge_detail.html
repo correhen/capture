@@ -4,7 +4,9 @@
 
 {% block content %}
 <style>
-  .detail-shell{display:grid;gap:18px;}
+  .detail-shell{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start;}
+  .main-col{display:grid;gap:18px;}
+  .sidebar{position:sticky;top:18px;display:grid;gap:12px;}
   .panel{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:22px;box-shadow:0 4px 8px rgba(0,0,0,.04);}
   .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:.82rem;font-weight:800;}
   .badge.easy{background:#dcfce7;color:#166534;}
@@ -29,127 +31,110 @@
   .preview-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;}
   .preview-card img,.hero-image img{width:100%;height:auto;border-radius:8px;border:1px solid #e2e8f0;background:#fff;}
   .preview-card audio,.preview-card video{width:100%;margin-top:8px;}
-  .file-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #e2e8f0;padding:12px 0;}
-  .file-row:first-child{border-top:0;}
   .submit-input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:1rem;}
   .submit-help{color:#64748b;font-size:.92rem;margin-top:6px;}
   .message{display:none;padding:14px 16px;border-radius:10px;margin-top:14px;}
   .message.success{display:block;background:#dcfce7;color:#166534;border:1px solid #86efac;}
   .message.error{display:block;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
   .success-actions{display:none;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  .secondary-link{color:#0f766e;text-decoration:none;font-weight:700;}
+  @media (max-width:860px){.detail-shell{grid-template-columns:1fr}.sidebar{position:static;}}
 </style>
 
 <div class="detail-shell">
-  <section class="panel">
-    <a href="{{ url_for('ch.challenges_index') }}" class="text-teal-700 font-semibold no-underline">Terug naar opdrachten</a>
-    <div class="flex justify-between items-start gap-3 flex-wrap mt-3">
-      <div>
-        <h1 class="text-3xl font-bold mb-1">{{ c.title }}</h1>
-        <div class="meta">
-          {% if c.difficulty %}
-            <span class="badge {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.difficulty }}</span>
-          {% endif %}
-          {% if c.points %}
-            <span class="badge points">{{ c.points }} pt</span>
-          {% endif %}
-          {% if c.solved %}
-            <span class="badge solved">Opgelost</span>
-          {% else %}
-            <span class="badge open">Open</span>
-          {% endif %}
-          <span class="badge open">{{ assets.files_count }} bestand{% if assets.files_count != 1 %}en{% endif %}</span>
+  <div class="main-col">
+    <section class="panel">
+      <a href="{{ url_for('ch.challenges_index') }}" class="text-teal-700 font-semibold no-underline">Terug naar opdrachten</a>
+      <h1 class="text-3xl font-bold mt-3 mb-1">{{ c.title }}</h1>
+      <div class="meta">
+        {% if c.difficulty %}
+          <span class="badge {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.difficulty }}</span>
+        {% endif %}
+        {% if c.points %}<span class="badge points">{{ c.points }} pt</span>{% endif %}
+        {% if c.solved %}<span class="badge solved">Opgelost</span>{% else %}<span class="badge open">Open</span>{% endif %}
+        <span class="badge open">{{ assets.files_count }} bestand{% if assets.files_count != 1 %}en{% endif %}</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="section-title">Opdracht</h2>
+      {% if assets.has_markdown %}
+        <div class="markdown-body">{{ assets.markdown_html }}</div>
+      {% else %}
+        <div class="fallback">Voor deze opdracht is nog geen webtekst beschikbaar. Bekijk de bestanden of download de opdrachtversie indien beschikbaar.</div>
+        {% if not assets.pdfs and assets.inline_images %}
+          <div class="hero-image mt-4">
+            <img src="{{ assets.inline_images[0].view_url }}" alt="{{ assets.inline_images[0].name }}">
+            <div class="actions"><a class="secondary-link" href="{{ assets.inline_images[0].download_url }}">Download deze afbeelding</a></div>
+          </div>
+        {% endif %}
+      {% endif %}
+    </section>
+
+    {% if assets.pdfs %}
+      <section id="pdf" class="panel">
+        <h2 class="section-title">PDF-versie</h2>
+        {% for pdf in assets.pdfs %}
+          <p><a class="secondary-link" href="{{ pdf.download_url }}">Download PDF-versie{% if assets.pdfs|length > 1 %}: {{ pdf.name }}{% endif %}</a></p>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    <section id="bijlagen" class="panel">
+      <h2 class="section-title">Bijlagen</h2>
+      {% if assets.attachments %}
+        <div class="preview-grid">
+          {% for f in assets.attachments %}
+            <div class="preview-card">
+              <strong>{{ f.name }}</strong>
+              {% if f.is_image %}
+                <img src="{{ f.view_url }}" alt="{{ f.name }}" class="mt-2">
+              {% elif f.is_audio %}
+                <audio controls src="{{ f.view_url }}"></audio>
+              {% elif f.is_video %}
+                <video controls src="{{ f.view_url }}"></video>
+              {% endif %}
+              <div class="actions"><a class="secondary-link" href="{{ f.download_url }}">Download bijlage</a></div>
+            </div>
+          {% endfor %}
         </div>
-      </div>
-      <div class="actions">
-        {% if c.db_id %}
-          <a class="btn" href="#submit-flag">Flag indienen</a>
-        {% endif %}
-        {% if assets.has_files %}
-          <a class="btn" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Alle bestanden van deze opdracht downloaden</a>
-        {% endif %}
-      </div>
-    </div>
-  </section>
+      {% else %}
+        <p class="text-slate-500">Geen extra bijlagen voor deze opdracht.</p>
+      {% endif %}
+      {% if assets.has_files %}
+        <div class="actions"><a class="secondary-link" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Alle bestanden downloaden</a></div>
+      {% endif %}
+    </section>
+  </div>
 
   {% if c.db_id %}
-    <section id="submit-flag" class="panel">
-      <h2 class="section-title">Flag indienen</h2>
-      {% if c.solved %}
-        <p class="text-slate-600">Deze opdracht is al opgelost door je team. Je kunt eventueel opnieuw indienen om je antwoord te controleren.</p>
-      {% else %}
-        <p class="text-slate-600">Vul je antwoord direct voor deze opdracht in. CTF{} mag, maar hoeft niet.</p>
-      {% endif %}
-      <form id="detail-submit-form" method="post" action="/api/submit">
-        <input type="hidden" name="challenge_id" value="{{ c.db_id }}">
-        <label for="detail-flag" class="font-bold">Antwoord</label>
-        <input id="detail-flag" class="submit-input" type="text" name="flag" placeholder="CTF{...} of alleen het antwoord" autocomplete="off" required>
-        <div class="submit-help">CTF{} is niet verplicht. Extra spaties aan het begin of eind worden genegeerd.</div>
-        <div class="actions">
-          <button class="btn" type="submit">Flag indienen</button>
-          <a class="btn" href="/submit?challenge_id={{ c.db_id }}">Open algemene submitpagina</a>
-        </div>
-      </form>
-      <div id="detail-submit-result" class="message" role="status"></div>
-      <div id="detail-success-actions" class="success-actions">
-        <a class="btn" href="{{ url_for('ch.challenges_index') }}">Terug naar opdrachten</a>
-        <a class="btn" href="/scoreboard">Scoreboard bekijken</a>
-        <a class="btn" href="{{ url_for('ch.challenges_index') }}">Pak nog een challenge</a>
-      </div>
-    </section>
-  {% endif %}
-
-  <section class="panel">
-    <h2 class="section-title">Opdracht</h2>
-    {% if assets.has_markdown %}
-      <div class="markdown-body">{{ assets.markdown_html }}</div>
-    {% else %}
-      <div class="fallback">Voor deze opdracht is nog geen webtekst beschikbaar. Bekijk de bestanden of download de opdrachtversie indien beschikbaar.</div>
-      {% if not assets.pdfs and assets.inline_images %}
-        <div class="hero-image mt-4">
-          <img src="{{ assets.inline_images[0].view_url }}" alt="{{ assets.inline_images[0].name }}">
-          <div class="actions">
-            <a class="btn" href="{{ assets.inline_images[0].download_url }}">Download deze afbeelding</a>
+    <aside id="submit-flag" class="sidebar">
+      <section class="panel">
+        <h2 class="section-title">Flag indienen</h2>
+        {% if c.solved %}
+          <div class="message success" style="display:block">✅ Opgelost door jouw team. Je kunt de opdracht nog bekijken.</div>
+        {% else %}
+          <p class="text-slate-600">Vul je antwoord in. CTF{} mag, maar hoeft niet.</p>
+          <form id="detail-submit-form" method="post" action="/api/submit">
+            <input type="hidden" name="challenge_id" value="{{ c.db_id }}">
+            <label for="detail-flag" class="font-bold">Antwoord</label>
+            <input id="detail-flag" class="submit-input" type="text" name="flag" placeholder="CTF{...} of alleen het antwoord" autocomplete="off" required>
+            <div class="submit-help">Extra spaties aan het begin of eind worden genegeerd.</div>
+            <div class="actions"><button class="btn" type="submit">Flag indienen</button></div>
+          </form>
+          <div id="detail-submit-result" class="message" role="status"></div>
+          <div id="detail-success-actions" class="success-actions">
+            <a class="secondary-link" href="{{ url_for('ch.challenges_index') }}">Terug naar opdrachten</a>
+            <a class="secondary-link" href="/scoreboard">Scoreboard</a>
           </div>
-        </div>
-      {% endif %}
-    {% endif %}
-  </section>
-
-  {% if assets.pdfs %}
-    <section id="pdf" class="panel">
-      <h2 class="section-title">PDF-versie</h2>
-      <div class="actions">
-        {% for pdf in assets.pdfs %}
-          <a class="btn" href="{{ pdf.download_url }}">Download PDF-versie van de opdracht{% if assets.pdfs|length > 1 %}: {{ pdf.name }}{% endif %}</a>
-        {% endfor %}
-      </div>
-    </section>
+        {% endif %}
+      </section>
+      <section class="panel">
+        <a class="secondary-link" href="{{ url_for('ch.challenges_index') }}">Terug naar opdrachten</a><br>
+        <a class="secondary-link" href="/scoreboard">Scoreboard</a>
+      </section>
+    </aside>
   {% endif %}
-
-  <section id="bijlagen" class="panel">
-    <h2 class="section-title">Bijlagen</h2>
-    {% if assets.attachments %}
-      <div class="preview-grid">
-        {% for f in assets.attachments %}
-          <div class="preview-card">
-            <strong>{{ f.name }}</strong>
-            {% if f.is_image %}
-              <img src="{{ f.view_url }}" alt="{{ f.name }}" class="mt-2">
-            {% elif f.is_audio %}
-              <audio controls src="{{ f.view_url }}"></audio>
-            {% elif f.is_video %}
-              <video controls src="{{ f.view_url }}"></video>
-            {% endif %}
-            <div class="actions">
-              <a class="btn" href="{{ f.download_url }}">Download</a>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="text-slate-500">Geen extra bijlagen voor deze opdracht.</p>
-    {% endif %}
-  </section>
 </div>
 
 <script>
@@ -162,15 +147,12 @@
       result.className = "message";
       result.textContent = "";
       successActions.style.display = "none";
-
       const response = await fetch("/api/submit", { method: "POST", body: new FormData(detailForm) });
       const data = await response.json();
       const correct = Boolean(data.ok && data.correct);
       result.textContent = data.message || data.error || "Er ging iets mis bij het indienen.";
       result.className = "message " + (correct ? "success" : "error");
-      if (correct) {
-        successActions.style.display = "flex";
-      }
+      if (correct) successActions.style.display = "flex";
     });
   }
 </script>

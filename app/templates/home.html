@@ -35,8 +35,10 @@
     .btn.secondary { background:#334155; }
     .btn.light { background:#e2e8f0; color:#0f172a; }
     .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
-    .teams { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
-    .team-tag { background:#eef6ff; color:#075985; padding:8px 12px; border-radius:999px; font-weight:700; cursor:pointer; text-decoration:none; border:1px solid #bae6fd; }
+    .teams { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-top:12px; }
+    .team-tag { background:#fff; color:#0f172a; padding:14px; border-radius:10px; font-weight:800; cursor:pointer; text-decoration:none; border:1px solid #e2e8f0; display:flex; align-items:center; gap:10px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+    .team-tag:hover{border-color:var(--team-color); box-shadow:0 4px 10px rgba(0,0,0,.07);}
+    .team-icon{width:32px;height:32px;border-radius:999px;display:grid;place-items:center;background:color-mix(in srgb, var(--team-color) 18%, white);color:var(--team-color);}
     .error { background:#fee2e2; color:#991b1b; padding:11px 12px; border-radius:8px; margin-bottom:12px; border:1px solid #fecaca; }
     .info { background:#ecfeff; color:#155e75; padding:12px; border-radius:8px; border:1px solid #a5f3fc; }
     .steps { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
@@ -61,7 +63,7 @@
         <a href="/scoreboard">🏆 Scoreboard</a>
         <a href="/scoreboard/islands">🏝️ Groepsranking</a>
         {% if current_team_status %}
-          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Wissel team</a></span>
+          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
         {% endif %}
       </nav>
     </div>
@@ -127,7 +129,7 @@
       {% if teams %}
         <div class="teams">
           {% for t in teams %}
-            <a href="#" class="team-tag" onclick="prefill('{{ t|e }}');return false;">{{ t }}</a>
+            <a href="#" class="team-tag" style="--team-color:{{ t.color }}" onclick="prefill('{{ t.name|e }}');return false;"><span class="team-icon">{{ t.icon }}</span><span>{{ t.name }}</span></a>
           {% endfor %}
         </div>
       {% else %}

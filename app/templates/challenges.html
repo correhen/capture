@@ -27,6 +27,7 @@
     .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
     .card { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:18px; box-shadow:0 4px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:12px; }
+    .card.solved-card{border-color:#86efac;background:#f7fef9;}
     .title { font-size:1.05rem; font-weight:800; }
     .meta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .badge { display:inline-flex; align-items:center; padding:4px 9px; border-radius:999px; font-size:.82rem; font-weight:700; }
@@ -39,6 +40,7 @@
     .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
     .btn { background:var(--c1); color:white; border:0; border-radius:8px; padding:10px 12px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; }
     .btn.secondary { background:#e2e8f0; color:#0f172a; padding:8px 10px; font-size:.9rem; }
+    .small-meta{color:#64748b;font-size:.88rem;display:flex;gap:10px;flex-wrap:wrap;}
     .btn.light { background:#e2e8f0; color:#0f172a; }
     .empty { background:white; border-radius:8px; padding:20px; border:1px solid #e2e8f0; }
   </style>
@@ -54,7 +56,7 @@
         <a href="/scoreboard">🏆 Scoreboard</a>
         <a href="/scoreboard/islands">🏝️ Groepsranking</a>
         {% if current_team_status %}
-          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Wissel team</a></span>
+          <span class="team-status team-pill"><span>{{ current_team_status.icon }}</span><span>{{ current_team_status.name }} · {{ current_team_status.score }} punten · {{ current_team_status.solved_count }} opgelost</span><a class="logout-link" href="/logout">Uitloggen</a></span>
         {% endif %}
       </nav>
     </div>
@@ -83,7 +85,7 @@
     {% if challenges %}
       <div class="grid">
         {% for c in challenges %}
-          <article class="card">
+          <article class="card {% if c.solved %}solved-card{% endif %}">
             <div class="title">{{ c.title }}</div>
             <div class="meta">
               <span class="badge {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.difficulty }}</span>
@@ -98,20 +100,18 @@
             {% if c.hint and c.hint_revealed %}
               <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px;color:#7c2d12">Tip: {{ c.hint }}</div>
             {% endif %}
+            <div class="small-meta">
+              {% if c.has_pdf %}<span>PDF beschikbaar</span>{% endif %}
+              {% if c.has_attachments %}<span>Bijlagen beschikbaar</span>{% endif %}
+            </div>
 
             <div class="actions">
               {% if team_logged_in %}
                 {% if c.has_files %}
-                  <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.slug) }}">Open opdracht</a>
-                  {% if c.has_pdf %}
-                    <a class="btn secondary" href="{{ url_for('ch.challenge_detail', cid=c.slug) }}#pdf">Download PDF</a>
-                  {% elif c.has_attachments %}
-                    <a class="btn secondary" href="{{ url_for('ch.challenge_detail', cid=c.slug) }}#bijlagen">Bekijk bestanden</a>
-                  {% endif %}
+                  <a class="btn" href="{{ url_for('ch.challenge_detail', cid=c.slug) }}">{% if c.solved %}Bekijk opdracht{% else %}Open opdracht{% endif %}</a>
                 {% elif c.pdf_url %}
                   <a class="btn" href="{{ c.pdf_url }}" target="_blank" rel="noopener">Open opdracht</a>
                 {% endif %}
-                <a class="btn light" href="/submit?challenge_id={{ c.id }}">Flag indienen</a>
               {% else %}
                 <a class="btn light" href="/">Kies eerst je team</a>
               {% endif %}
