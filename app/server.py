@@ -18,7 +18,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from database import db
-from models import sha256_hex, DIFFICULTY_POINTS, flag_hash_candidates
+from models import sha256_hex, DIFFICULTY_POINTS, flag_hash_candidates, unwrap_ctf_flag
 from challenges import ch, find_challenge, slugify
 
 # =========================
@@ -379,8 +379,7 @@ def random_challenge():
         if row["id"] in solved:
             continue
         slug = slugify(row["title"])
-        if find_challenge(row["title"]) or find_challenge(slug):
-            remaining.append({"id": row["id"], "title": row["title"], "slug": slug})
+        remaining.append({"id": row["id"], "title": row["title"], "slug": slug})
 
     if not remaining:
         return render_template("random_done.html", theme=get_theme()), 200
@@ -825,11 +824,14 @@ def admin_challenges_page():
         checked = "checked" if r["is_active"] else ""
         hint_btn = "Hint verbergen" if r["hint_revealed"] else "Hint vrijgeven"
         hint_action = "hide" if r["hint_revealed"] else "show"
+        folder = find_challenge(r["title"]) or find_challenge(slugify(r["title"]))
+        file_status = "Map/bestanden" if folder else "Database-only"
         row_html += f"""
           <tr>
             <td style='padding:8px 12px'>{r['id']}</td>
             <td style='padding:8px 12px'>{r['title']}</td>
             <td style='padding:8px 12px'>{r['difficulty']} ({r['points']} pt)</td>
+            <td style='padding:8px 12px'>{file_status}</td>
             <td style='padding:8px 12px'>
               <form method="post" action="/admin/challenges/toggle" style="display:inline">
                 <input type="hidden" name="id" value="{r['id']}"/>
@@ -864,26 +866,28 @@ def admin_challenges_page():
             <th style='text-align:left;padding:8px 12px'>ID</th>
             <th style='text-align:left;padding:8px 12px'>Titel</th>
             <th style='text-align:left;padding:8px 12px'>Moeilijkheid (pt)</th>
+            <th style='text-align:left;padding:8px 12px'>Bestanden</th>
             <th style='text-align:left;padding:8px 12px'>Status + Hint</th>
           </tr>
         </thead>
         <tbody>
-          {row_html or "<tr><td colspan='4' style='padding:12px'>Nog geen challenges</td></tr>"}
+          {row_html or "<tr><td colspan='5' style='padding:12px'>Nog geen challenges</td></tr>"}
         </tbody>
       </table>
 
       <h3>Nieuwe challenge toevoegen</h3>
-      <form method="post" action="/admin/challenges/add" style='display:grid;grid-template-columns:1fr 160px 1fr 1fr auto;gap:8px;align-items:center'>
+      <form method="post" action="/admin/challenges/add" style='display:grid;grid-template-columns:1fr 150px 110px 1fr 1fr;gap:8px;align-items:center'>
         <input name="title" placeholder="Titel" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
         <select name="difficulty" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px'>
           {diff_options}
         </select>
-        <input name="flag" placeholder="CTF{{...}}" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <input name="points" type="number" min="1" step="1" placeholder="Punten" style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <input name="flag" placeholder="Flag/antwoord" required style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
         <input name="pdf_url" placeholder="PDF URL (optioneel)" style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
-        <input name="hint" placeholder="Tip/hint (optioneel)" style='padding:8px;border:1px solid #cbd5e1;border-radius:6px' />
+        <input name="hint" placeholder="Tip/hint (optioneel)" style='padding:8px;border:1px solid #cbd5e1;border-radius:6px;grid-column:1/4' />
         <label style='display:flex;gap:6px;align-items:center;'>
-          <input type="checkbox" name="active" value="1" checked />
-          Actief
+          <input type="checkbox" name="active" value="1" />
+          Actief / zichtbaar voor deelnemers
         </label>
         <button style='padding:8px 12px;background:#0d9488;color:#fff;border:none;border-radius:6px;grid-column:1/-1;justify-self:start'>Toevoegen</button>
       </form>
@@ -924,6 +928,7 @@ def admin_challenges_add():
         return "Niet ingelogd als admin", 401
     title = (request.form.get("title") or "").strip()
     difficulty = (request.form.get("difficulty") or "").strip()
+    points_raw = (request.form.get("points") or "").strip()
     flag = (request.form.get("flag") or "").strip()
     pdf_url = (request.form.get("pdf_url") or "").strip()
     hint = (request.form.get("hint") or "").strip()
@@ -935,12 +940,20 @@ def admin_challenges_add():
     if difficulty not in DIFFICULTY_POINTS:
         session["admin_msg"] = f"Onbekende difficulty: {difficulty}"
         return redirect("/admin/challenges")
-    if not (flag.startswith("CTF{") and flag.endswith("}")):
-        session["admin_msg"] = "Flag moet de vorm CTF{...} hebben."
+    normalized_flag = unwrap_ctf_flag(flag).strip()
+    if not normalized_flag:
+        session["admin_msg"] = "Flag/antwoord mag niet leeg zijn."
+        return redirect("/admin/challenges")
+    try:
+        points = int(points_raw) if points_raw else DIFFICULTY_POINTS[difficulty]
+    except ValueError:
+        session["admin_msg"] = "Punten moet een geldig getal zijn."
+        return redirect("/admin/challenges")
+    if points <= 0:
+        session["admin_msg"] = "Punten moet groter zijn dan 0."
         return redirect("/admin/challenges")
 
-    points = DIFFICULTY_POINTS[difficulty]
-    fhash = sha256_hex(flag)
+    fhash = sha256_hex(normalized_flag.lower())
     with db() as conn:
         conn.execute(
             """

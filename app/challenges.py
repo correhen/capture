@@ -216,6 +216,18 @@ def find_challenge(cid: str) -> Optional[Dict[str, object]]:
 
     return None
 
+def find_db_challenge(cid: str):
+    cid_clean = (cid or "").strip()
+    cid_low = cid_clean.lower()
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, title, difficulty, points, pdf_url, hint, hint_revealed FROM challenges WHERE is_active=1"
+        ).fetchall()
+    for row in rows:
+        if cid_clean == str(row["id"]) or cid_low == row["title"].lower() or cid_low == slugify(row["title"]):
+            return row
+    return None
+
 def secure_join(base: Path, rel: str) -> Optional[Path]:
     """
     Veilig samenvoegen van base + rel zonder directory traversal.
@@ -296,10 +308,12 @@ def challenges_index():
             "hint": row["hint"],
             "hint_revealed": row["hint_revealed"],
             "solved": row["id"] in solved,
-            "has_files": bool(folder),
+            "has_folder": bool(folder),
+            "has_files": bool(folder and assets["has_files"]),
             "has_pdf": bool(assets["pdfs"]),
             "has_attachments": bool(assets["attachments"]),
             "attachments_count": len(assets["attachments"]),
+            "is_database_only": not bool(folder),
         })
     progress = {
         "solved": sum(1 for c in challenges if c["solved"]),
@@ -326,16 +340,20 @@ def challenge_detail(cid: str):
         return login_required_redirect()
 
     chobj = find_challenge(cid)
-    if not chobj:
+    db_challenge = find_db_challenge(cid)
+    if not chobj and not db_challenge:
         abort(404)
 
-    db_challenge = None
+    if not chobj and db_challenge:
+        chobj = {"title": db_challenge["title"], "slug": slugify(db_challenge["title"]), "path": None}
+
     solved = False
     with db() as conn:
-        db_challenge = conn.execute(
-            "SELECT id, difficulty, points FROM challenges WHERE LOWER(title)=LOWER(?) AND is_active=1",
-            (chobj["title"],)
-        ).fetchone()
+        if not db_challenge:
+            db_challenge = conn.execute(
+                "SELECT id, title, difficulty, points, pdf_url, hint, hint_revealed FROM challenges WHERE LOWER(title)=LOWER(?) AND is_active=1",
+                (chobj["title"],)
+            ).fetchone()
         if db_challenge:
             team = _current_team_row()
             solved = conn.execute(
@@ -343,7 +361,18 @@ def challenge_detail(cid: str):
                 (team["id"], db_challenge["id"])
             ).fetchone() is not None
 
-    assets = challenge_assets(chobj)
+    if chobj.get("path"):
+        assets = challenge_assets(chobj)
+    else:
+        assets = {
+            "has_markdown": False,
+            "markdown_html": None,
+            "pdfs": [],
+            "attachments": [],
+            "inline_images": [],
+            "files_count": 0,
+            "has_files": False,
+        }
     return render_template(
         "challenge_detail.html",
         c={
@@ -353,6 +382,7 @@ def challenge_detail(cid: str):
             "difficulty": db_challenge["difficulty"] if db_challenge else None,
             "points": db_challenge["points"] if db_challenge else None,
             "solved": solved,
+            "database_only": not bool(chobj.get("path")),
         },
         assets=assets,
         theme=get_theme(),

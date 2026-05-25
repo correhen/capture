@@ -68,6 +68,8 @@
       <h2 class="section-title">Opdracht</h2>
       {% if assets.has_markdown %}
         <div class="markdown-body">{{ assets.markdown_html }}</div>
+      {% elif c.database_only %}
+        <div class="fallback">Deze opdracht is door de trainer toegevoegd tijdens de sessie. Vul de ontvangen flag in om de punten te verdienen.</div>
       {% else %}
         <div class="fallback">Voor deze opdracht is nog geen webtekst beschikbaar. Bekijk de bestanden of download de opdrachtversie indien beschikbaar.</div>
         {% if not assets.pdfs and assets.inline_images %}
@@ -88,31 +90,33 @@
       </section>
     {% endif %}
 
-    <section id="bijlagen" class="panel">
-      <h2 class="section-title">Bijlagen</h2>
-      {% if assets.attachments %}
-        <div class="preview-grid">
-          {% for f in assets.attachments %}
-            <div class="preview-card">
-              <strong>{{ f.name }}</strong>
-              {% if f.is_image %}
-                <img src="{{ f.view_url }}" alt="{{ f.name }}" class="mt-2">
-              {% elif f.is_audio %}
-                <audio controls src="{{ f.view_url }}"></audio>
-              {% elif f.is_video %}
-                <video controls src="{{ f.view_url }}"></video>
-              {% endif %}
-              <div class="actions"><a class="secondary-link" href="{{ f.download_url }}">Download bijlage</a></div>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="text-slate-500">Geen extra bijlagen voor deze opdracht.</p>
-      {% endif %}
-      {% if assets.has_files %}
-        <div class="actions"><a class="secondary-link" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Alle bestanden downloaden</a></div>
-      {% endif %}
-    </section>
+    {% if assets.attachments or assets.has_files %}
+      <section id="bijlagen" class="panel">
+        <h2 class="section-title">Bijlagen</h2>
+        {% if assets.attachments %}
+          <div class="preview-grid">
+            {% for f in assets.attachments %}
+              <div class="preview-card">
+                <strong>{{ f.name }}</strong>
+                {% if f.is_image %}
+                  <img src="{{ f.view_url }}" alt="{{ f.name }}" class="mt-2">
+                {% elif f.is_audio %}
+                  <audio controls src="{{ f.view_url }}"></audio>
+                {% elif f.is_video %}
+                  <video controls src="{{ f.view_url }}"></video>
+                {% endif %}
+                <div class="actions"><a class="secondary-link" href="{{ f.download_url }}">Download bijlage</a></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-slate-500">Geen extra bijlagen voor deze opdracht.</p>
+        {% endif %}
+        {% if assets.has_files %}
+          <div class="actions"><a class="secondary-link" href="{{ url_for('ch.challenge_bundle', cid=c.id) }}">Alle bestanden downloaden</a></div>
+        {% endif %}
+      </section>
+    {% endif %}
   </div>
 
   {% if c.db_id %}

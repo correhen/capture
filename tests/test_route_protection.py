@@ -24,7 +24,10 @@ class RouteProtectionTests(unittest.TestCase):
             team = conn.execute("SELECT token FROM teams ORDER BY id LIMIT 1").fetchone()
             self.team_id = conn.execute("SELECT id FROM teams ORDER BY id LIMIT 1").fetchone()["id"]
             conn.execute("DELETE FROM solves")
+            conn.execute("UPDATE teams SET score=0")
+            conn.execute("UPDATE challenges SET is_active=0")
             conn.execute("DELETE FROM challenges WHERE title=?", ("CTF01 - Voorbeeldvraag",))
+            conn.execute("DELETE FROM challenges WHERE title IN (?, ?, ?)", ("Kahoot bonus", "Extra opdracht", "Verborgen bonus"))
             conn.execute(
                 "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,1)",
                 ("CTF01 - Voorbeeldvraag", "makkelijk", sha256_hex("CTF{TESTANSWER}"), 1),
@@ -34,6 +37,18 @@ class RouteProtectionTests(unittest.TestCase):
                 ("CTF01 - Voorbeeldvraag",),
             ).fetchone()["id"]
         self.team_token = team["token"]
+
+    def add_db_only_challenge(self, title="Kahoot bonus", flag="bonus", points=2, active=1):
+        with db() as conn:
+            conn.execute("DELETE FROM challenges WHERE title=?", (title,))
+            conn.execute(
+                "INSERT INTO challenges(title, difficulty, flag_hash, points, is_active) VALUES(?,?,?,?,?)",
+                (title, "gemiddeld", sha256_hex(flag.lower()), points, active),
+            )
+            return conn.execute(
+                "SELECT id FROM challenges WHERE title=?",
+                (title,),
+            ).fetchone()["id"]
 
     def tearDown(self):
         for path in self.temp_challenge_dirs:
@@ -196,7 +211,7 @@ class RouteProtectionTests(unittest.TestCase):
         with db() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO solves(team_id, challenge_id, solved_at) VALUES(?,?,?)",
-                (self.team_id, self.ctf01_id, "2026-05-19 20:27:00"),
+                (self.team_id, self.ctf01_id, "2099-05-19 20:27:00"),
             )
         ticker = self.client.get("/api/ticker").get_json()
         self.assertTrue(any("16:27" in item for item in ticker["items"]))
@@ -226,6 +241,86 @@ class RouteProtectionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Jullie hebben alle opdrachten opgelost!", body)
         self.assertIn("Scoreboard bekijken", body)
+
+    def test_active_database_only_challenge_is_playable(self):
+        bonus_id = self.add_db_only_challenge("Kahoot bonus", "bonus", 2, active=1)
+        self.login()
+
+        overview = self.client.get("/challenges").data.decode("utf-8")
+        self.assertIn("Kahoot bonus", overview)
+        self.assertIn('href="/challenge/kahoot-bonus"', overview)
+        self.assertIn("Traineropdracht", overview)
+
+        detail = self.client.get("/challenge/kahoot-bonus", follow_redirects=False)
+        body = detail.data.decode("utf-8")
+        self.assertEqual(detail.status_code, 200)
+        self.assertIn("Kahoot bonus", body)
+        self.assertIn("door de trainer toegevoegd", body)
+        self.assertIn('id="detail-submit-form"', body)
+        self.assertNotIn("PDF-versie", body)
+        self.assertNotIn("Bijlagen", body)
+
+        result = self.client.post(
+            "/api/submit",
+            data={"challenge_id": str(bonus_id), "flag": "BONUS"},
+        ).get_json()
+        self.assertTrue(result["correct"])
+        with db() as conn:
+            team = conn.execute("SELECT score FROM teams WHERE id=?", (self.team_id,)).fetchone()
+        self.assertEqual(team["score"], 2)
+
+        scoreboard = self.client.get("/scoreboard").data.decode("utf-8")
+        self.assertIn("2", scoreboard)
+        ticker = self.client.get("/api/ticker").get_json()
+        self.assertTrue(any("Kahoot bonus" in item for item in ticker["items"]))
+
+    def test_inactive_database_only_challenge_hidden_but_admin_visible(self):
+        self.add_db_only_challenge("Verborgen bonus", "winnaar2026", 2, active=0)
+        self.login()
+        overview = self.client.get("/challenges").data.decode("utf-8")
+        self.assertNotIn("Verborgen bonus", overview)
+
+        random_response = self.client.get("/random-challenge", follow_redirects=False)
+        self.assertNotIn("verborgen-bonus", random_response.location or "")
+
+        with self.client.session_transaction() as sess:
+            sess["admin_ok"] = True
+        admin = self.client.get("/admin/challenges").data.decode("utf-8")
+        self.assertIn("Verborgen bonus", admin)
+        self.assertIn("Database-only", admin)
+        self.assertIn("Uit", admin)
+
+    def test_admin_can_add_flexible_database_only_challenge(self):
+        with self.client.session_transaction() as sess:
+            sess["admin_ok"] = True
+        response = self.client.post(
+            "/admin/challenges/add",
+            data={
+                "title": "Extra opdracht",
+                "difficulty": "gemiddeld",
+                "points": "2",
+                "flag": "winnaar2026",
+                "active": "1",
+            },
+            follow_redirects=True,
+        )
+        body = response.data.decode("utf-8")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Extra opdracht", body)
+        self.assertIn("Database-only", body)
+
+        self.login()
+        detail = self.client.get("/challenge/extra-opdracht")
+        self.assertEqual(detail.status_code, 200)
+        result = self.client.post(
+            "/api/submit",
+            data={"challenge_id": str(self._challenge_id("Extra opdracht")), "flag": "WINNAAR2026"},
+        ).get_json()
+        self.assertTrue(result["correct"])
+
+    def _challenge_id(self, title):
+        with db() as conn:
+            return conn.execute("SELECT id FROM challenges WHERE title=?", (title,)).fetchone()["id"]
 
     def test_challenges_overview_keeps_pdf_secondary(self):
         self.login()

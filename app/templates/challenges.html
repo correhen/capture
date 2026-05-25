@@ -129,9 +129,9 @@
       </div>
       <div class="grid">
         {% for c in challenges %}
-          {% set detail_url = url_for('ch.challenge_detail', cid=c.slug) if c.has_files else c.pdf_url %}
-          {% set card_tag = 'a' if team_logged_in and detail_url else 'article' %}
-          <{{ card_tag }} class="card challenge-card {% if c.solved %}solved-card{% endif %}" {% if team_logged_in and detail_url %}href="{{ detail_url }}"{% if not c.has_files %} target="_blank" rel="noopener"{% endif %}{% endif %} data-status="{% if c.solved %}solved{% else %}open{% endif %}" data-difficulty="{{ c.difficulty }}">
+          {% set detail_url = url_for('ch.challenge_detail', cid=c.slug) %}
+          {% set card_tag = 'a' if team_logged_in else 'article' %}
+          <{{ card_tag }} class="card challenge-card {% if c.solved %}solved-card{% endif %}" {% if team_logged_in %}href="{{ detail_url }}"{% endif %} data-status="{% if c.solved %}solved{% else %}open{% endif %}" data-difficulty="{{ c.difficulty }}">
             <div class="title">{{ c.title }}</div>
             <div class="meta">
               <span class="badge {% if c.difficulty=='makkelijk' %}easy{% elif c.difficulty=='gemiddeld' %}medium{% else %}hard{% endif %}">{{ c.difficulty }}</span>
@@ -149,9 +149,10 @@
             <div class="small-meta">
               {% if c.has_pdf %}<span>PDF beschikbaar</span>{% endif %}
               {% if c.has_attachments %}<span>{{ c.attachments_count }} bijlage{% if c.attachments_count != 1 %}n{% endif %}</span>{% endif %}
+              {% if c.is_database_only %}<span>Traineropdracht</span>{% endif %}
             </div>
 
-            {% if team_logged_in and detail_url %}
+            {% if team_logged_in %}
               <span class="open-link">{% if c.solved %}Bekijk opdracht{% else %}Open opdracht{% endif %} ›</span>
             {% else %}
               <span class="open-link">Kies eerst je team ›</span>
